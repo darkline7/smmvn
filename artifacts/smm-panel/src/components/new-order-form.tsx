@@ -260,7 +260,7 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
           <SelectTrigger className="bg-background h-11">
             <SelectValue placeholder="-- Chọn nền tảng --" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-72 overflow-y-auto">
             <SelectItem value="all">🌐 Tất cả nền tảng</SelectItem>
             {platforms.map(p => (
               <SelectItem key={p} value={p}>
@@ -293,36 +293,49 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
         </Select>
       </div>
 
-      {/* 4. Service */}
+      {/* 4. Service — scrollable list */}
       <div className="space-y-1">
         <Label className="text-sm font-medium">Dịch vụ</Label>
-        <Select
-          value={serviceId?.toString() || ""}
-          onValueChange={val => {
-            const id = parseInt(val);
-            setServiceId(id);
-            const svc = services.find((s: any) => s.id === id);
-            if (svc?.min) setQuantity(svc.min);
-          }}
-          disabled={!catId || svcLoading || services.length === 0}
-        >
-          <SelectTrigger className="bg-background h-11">
-            {svcLoading ? (
-              <span className="flex items-center gap-2 text-muted-foreground text-sm">
-                <Loader2 className="w-4 h-4 animate-spin" /> Đang tải...
-              </span>
-            ) : (
-              <SelectValue placeholder={!catId ? "Chọn phân loại trước" : services.length === 0 ? "Không có dịch vụ" : "-- Chọn dịch vụ --"} />
-            )}
-          </SelectTrigger>
-          <SelectContent className="max-h-72">
-            {services.map((svc: any) => (
-              <SelectItem key={svc.id} value={svc.id.toString()}>
-                #{svc.id} — {svc.name} (${Number(svc.rate).toFixed(3)}/1K)
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!catId ? (
+          <div className="border rounded-xl bg-muted/30 py-4 text-center text-sm text-muted-foreground">
+            Chọn phân loại trước
+          </div>
+        ) : svcLoading ? (
+          <div className="border rounded-xl bg-muted/30 py-5 flex items-center justify-center">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : services.length === 0 ? (
+          <div className="border rounded-xl bg-muted/30 py-4 text-center text-sm text-muted-foreground">
+            Không có dịch vụ trong phân loại này
+          </div>
+        ) : (
+          <div className="border rounded-xl overflow-hidden shadow-sm">
+            {serviceId && (() => {
+              const sel = services.find((s: any) => s.id === serviceId);
+              return sel ? (
+                <div className="bg-primary/10 border-b px-3 py-2 flex items-start gap-2">
+                  <span className="font-mono text-xs bg-primary text-primary-foreground px-1.5 py-0.5 rounded shrink-0 mt-0.5">#{sel.id}</span>
+                  <span className="flex-1 text-sm font-medium leading-snug">{sel.name}</span>
+                  <span className="text-xs text-primary font-semibold shrink-0 mt-0.5">{calcVND(Number(sel.rate), vndRate)}/1K</span>
+                </div>
+              ) : null;
+            })()}
+            <div className="max-h-52 overflow-y-auto divide-y">
+              {services.map((svc: any) => (
+                <button
+                  key={svc.id}
+                  type="button"
+                  onClick={() => { setServiceId(svc.id); if (svc.min) setQuantity(svc.min); }}
+                  className={`w-full px-3 py-2.5 text-left flex items-start gap-2 hover:bg-muted/50 transition-colors ${serviceId === svc.id ? "bg-primary/5" : ""}`}
+                >
+                  <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0 mt-0.5">#{svc.id}</span>
+                  <span className="flex-1 text-sm text-foreground leading-snug">{svc.name}</span>
+                  <span className="text-xs text-primary font-medium shrink-0 mt-0.5">{calcVND(Number(svc.rate), vndRate)}/1K</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 5. Link */}

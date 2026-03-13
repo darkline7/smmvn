@@ -1,21 +1,34 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useGetReferrals, useGetMe } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
+import { useGetMe } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { Users, Copy, CheckCircle2, Gift, TrendingUp, DollarSign } from "lucide-react";
 import { useState } from "react";
 
+const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
+
 export default function Referrals() {
   const { toast } = useToast();
   const { data: me } = useGetMe();
-  const { data } = useGetReferrals();
   const [copied, setCopied] = useState(false);
+
+  const { data } = useQuery<any>({
+    queryKey: ["referrals"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/referrals`, { credentials: "include" });
+      if (!r.ok) return { referrals: [] };
+      return r.json();
+    },
+    staleTime: 60_000,
+  });
+
   const referrals = data?.referrals || [];
-  const totalCommission = referrals.reduce((s: number, r: any) => s + Number(r.commission), 0);
-  const refLink = `${window.location.origin}/register?ref=${me?.username}`;
+  const totalCommission = referrals.reduce((s: number, r: any) => s + Number(r.commission || 0), 0);
+  const refLink = `${window.location.origin}/register?ref=${me?.username || ""}`;
 
   const copy = () => {
     navigator.clipboard.writeText(refLink);

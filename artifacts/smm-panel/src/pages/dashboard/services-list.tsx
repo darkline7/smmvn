@@ -136,20 +136,15 @@ export default function ServicesList() {
             >
               🌐 Tất cả ({totalActive.toLocaleString()})
             </button>
-            {platforms.map(platform => {
-              const count = (catData?.categories || [])
-                .filter(c => detectPlatform(c.name) === platform)
-                .reduce((acc, c) => acc + ((c as any).serviceCount || 0), 0);
-              return (
-                <button
-                  key={platform}
-                  onClick={() => { setSelectedPlatform(platform); setSelectedCat("all"); }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedPlatform === platform ? "bg-primary text-primary-foreground shadow-md" : "bg-muted hover:bg-muted/80 text-foreground"}`}
-                >
-                  {PLATFORM_EMOJIS[platform] || "📦"} {platform} {count > 0 && <span className="opacity-70">({count})</span>}
-                </button>
-              );
-            })}
+            {platforms.map(platform => (
+              <button
+                key={platform}
+                onClick={() => { setSelectedPlatform(platform); setSelectedCat("all"); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedPlatform === platform ? "bg-primary text-primary-foreground shadow-md" : "bg-muted hover:bg-muted/80 text-foreground"}`}
+              >
+                {PLATFORM_EMOJIS[platform] || "📦"} {platform}
+              </button>
+            ))}
           </div>
         </div>
 

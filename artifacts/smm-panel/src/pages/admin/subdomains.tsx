@@ -34,6 +34,28 @@ export default function AdminSubdomains() {
     refetchInterval: 30_000,
   });
 
+  const verifyNsMut = useMutation({
+    mutationFn: async (id: number) => {
+      const r = await fetch(`${BASE}/api/subdomains/admin/${id}/verify-ns`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const json = await r.json();
+      if (!r.ok) throw new Error(json.error || "Lỗi");
+      return json;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: data.dnsOk ? "✅ DNS đã trỏ đúng!" : "⚠️ DNS chưa trỏ đúng",
+        description: data.dnsOk
+          ? "Domain đã xác nhận. Bạn có thể kích hoạt."
+          : "CNAME chưa trỏ về server. Kiểm tra lại cấu hình DNS.",
+      });
+      qc.invalidateQueries({ queryKey: ["admin-subdomains"] });
+    },
+    onError: (e: any) => toast({ variant: "destructive", title: "Lỗi kiểm tra NS", description: e.message }),
+  });
+
   const updateMut = useMutation({
     mutationFn: async ({ id, status, adminNote, nsVerified }: any) => {
       const r = await fetch(`${BASE}/api/subdomains/admin/${id}`, {
@@ -152,8 +174,14 @@ export default function AdminSubdomains() {
                                 <div className="space-y-3 max-w-lg">
                                   <div className="flex flex-wrap gap-2">
                                     <Button size="sm" variant="outline" className="text-green-600 border-green-300 hover:bg-green-50"
-                                      onClick={() => updateMut.mutate({ id: sub.id, status: "active", nsVerified: true })}>
+                                      onClick={() => updateMut.mutate({ id: sub.id, status: "active", nsVerified: true })}
+                                      disabled={updateMut.isPending}>
                                       <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Duyệt & Kích hoạt
+                                    </Button>
+                                    <Button size="sm" variant="outline"
+                                      onClick={() => verifyNsMut.mutate(sub.id)}
+                                      disabled={verifyNsMut.isPending}>
+                                      🔍 Kiểm tra NS tự động
                                     </Button>
                                     <Button size="sm" variant="outline" className="text-amber-600 border-amber-300 hover:bg-amber-50"
                                       onClick={() => updateMut.mutate({ id: sub.id, status: "suspended" })}>
@@ -162,10 +190,6 @@ export default function AdminSubdomains() {
                                     <Button size="sm" variant="outline" className="text-red-600 border-red-300 hover:bg-red-50"
                                       onClick={() => updateMut.mutate({ id: sub.id, status: "rejected" })}>
                                       <XCircle className="w-3.5 h-3.5 mr-1" /> Từ chối
-                                    </Button>
-                                    <Button size="sm" variant="outline"
-                                      onClick={() => updateMut.mutate({ id: sub.id, nsVerified: !sub.nsVerified })}>
-                                      {sub.nsVerified ? "Hủy xác nhận NS" : "✓ Xác nhận NS"}
                                     </Button>
                                   </div>
                                   <div className="flex gap-2">

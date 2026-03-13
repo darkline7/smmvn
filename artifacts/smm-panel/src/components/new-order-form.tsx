@@ -238,7 +238,7 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
         </div>
         <p className="text-xs text-muted-foreground">Nhập tên hoặc ID dịch vụ để tìm kiếm và tự động chọn</p>
         {showSearch && searchResults.length > 0 && (
-          <div className="absolute left-0 right-0 top-full z-50 bg-background border border-border rounded-xl shadow-xl max-h-64 overflow-y-auto">
+          <div className="absolute left-0 right-0 top-full z-50 bg-background border border-border rounded-xl shadow-xl max-h-48 sm:max-h-64 overflow-y-auto">
             {searchResults.map((svc: any) => (
               <button
                 key={svc.id} type="button"
@@ -321,7 +321,7 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
                 </div>
               ) : null;
             })()}
-            <div className="max-h-52 overflow-y-auto divide-y">
+            <div className="max-h-40 sm:max-h-52 overflow-y-auto divide-y">
               {services.map((svc: any) => (
                 <button
                   key={svc.id}

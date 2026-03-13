@@ -89,12 +89,15 @@ router.get("/referrals", requireAuth as any, async (req: AuthRequest, res: any) 
   }).from(referralsTable).where(eq(referralsTable.referrerId, req.userId!)).orderBy(desc(referralsTable.createdAt));
 
   const totalCommission = history.reduce((sum, r) => sum + Number(r.commission), 0);
+  const commissionSetting = await db.select({ value: siteSettingsTable.value }).from(siteSettingsTable).where(sql`key = 'referral_commission'`).limit(1);
+  const commissionRate = Number(commissionSetting[0]?.value || "5") / 100;
   return res.json({
     referralCode,
     referralLink,
     totalReferrals: history.length,
     totalCommission,
-    commissionRate: 0.05,
+    commissionRate,
+    referrals: history,
     history,
   });
 });
@@ -181,7 +184,7 @@ async function syncOneProvider(provider: typeof providersTable.$inferSelect): Pr
   }
 }
 
-// GET /api/cron/sync-all?secret=xxx  — sync all active providers + return stats
+// GET /api/cron/sync-all?secret=xxx — returns DB stats immediately, syncs in background
 router.get("/cron/sync-all", async (req, res) => {
   try {
     const settings = await getSettings();
@@ -189,21 +192,15 @@ router.get("/cron/sync-all", async (req, res) => {
     if (!cronSecret || req.query.secret !== cronSecret) {
       return res.status(401).json({ error: "Invalid cron secret" });
     }
-    const providers = await db.select().from(providersTable).where(eq(providersTable.status, "active"));
-    const results = await Promise.allSettled(providers.map(p => syncOneProvider(p)));
-    const summary = results.map((r, i) => ({
-      provider: providers[i].name,
-      ...(r.status === "fulfilled" ? r.value : { error: String(r.reason) }),
-    }));
 
-    // Fetch DB stats and provider balances
+    const providers = await db.select().from(providersTable).where(eq(providersTable.status, "active"));
     const [{ catCount }] = await db.select({ catCount: sql<number>`count(*)` }).from(categoriesTable);
     const [{ svcCount }] = await db.select({ svcCount: sql<number>`count(*)` }).from(servicesTable);
 
-    // Fetch balance from each provider (parallel, best-effort, short timeout)
+    // Fetch provider balances quickly (short timeout)
     const balances = await Promise.allSettled(providers.map(async (p) => {
       try {
-        const resp = await callProviderApi(p.baseUrl, p.apiKey, { action: "balance" }, 15000);
+        const resp = await callProviderApi(p.baseUrl, p.apiKey, { action: "balance" }, 10000);
         const data = await resp.json() as any;
         return { provider: p.name, balance: data.balance ?? data.Balance ?? "-", currency: data.currency ?? "USD" };
       } catch {
@@ -211,16 +208,28 @@ router.get("/cron/sync-all", async (req, res) => {
       }
     }));
 
-    return res.json({
+    // Return immediately — sync runs in background
+    res.json({
       success: true,
-      synced: providers.length,
+      message: `Đồng bộ đang chạy nền cho ${providers.length} provider(s)`,
       stats: {
         totalCategories: Number(catCount),
         totalServices: Number(svcCount),
         providerBalances: balances.map(r => r.status === "fulfilled" ? r.value : { balance: "-" }),
       },
-      results: summary,
       timestamp: new Date().toISOString(),
+    });
+
+    // Background sync (does not block the response)
+    setImmediate(async () => {
+      try {
+        for (const p of providers) {
+          await syncOneProvider(p).catch((e: any) => console.error(`[sync] ${p.name}:`, e.message));
+        }
+        console.log(`[cron/sync-all] Done syncing ${providers.length} providers`);
+      } catch (e: any) {
+        console.error("[cron/sync-all] background error:", e.message);
+      }
     });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });

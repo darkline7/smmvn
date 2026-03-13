@@ -85,12 +85,13 @@ router.post("/cards", requireAuth as any, async (req: AuthRequest, res: any) => 
 
     // Get partner credentials from site settings
     const settings = await db.select().from(siteSettingsTable)
-      .where(sql`key IN ('card_partner_id', 'card_partner_key', 'vnd_exchange_rate')`);
+      .where(sql`key IN ('card_partner_id', 'card_partner_key', 'vnd_exchange_rate', 'card_api_url')`);
     const settingsMap: Record<string, string> = {};
     for (const s of settings) settingsMap[s.key] = s.value || "";
 
     const partnerId = settingsMap["card_partner_id"];
     const partnerKey = settingsMap["card_partner_key"];
+    const cardApiUrl = settingsMap["card_api_url"] || "https://thesieure.com/chargingws/v2";
     if (!partnerId || !partnerKey) {
       return res.status(400).json({ error: "Nạp thẻ cào chưa được cấu hình. Vui lòng liên hệ admin." });
     }
@@ -124,7 +125,7 @@ router.post("/cards", requireAuth as any, async (req: AuthRequest, res: any) => 
         request_id: requestId,
         ...(callbackUrl ? { callback_url: callbackUrl } : {}),
       });
-      const resp = await fetch("https://gachthevip.vn/api/v2", {
+      const resp = await fetch(cardApiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: body.toString(),

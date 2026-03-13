@@ -321,10 +321,20 @@ export default function AdminSettings() {
               <Field label="Nạp tối thiểu ($)" id="min_deposit" value={form.min_deposit || "1"} onChange={set("min_deposit")} type="number" />
               <Field label="Nạp tối đa ($)" id="max_deposit" value={form.max_deposit || "10000"} onChange={set("max_deposit")} type="number" />
             </SettingsSection>
-            <SettingsSection title="Thẻ cào điện thoại (thesieure.com)" icon={<span className="text-base">📱</span>}>
-              <p className="text-xs text-muted-foreground">Đăng ký đối tác tại <a href="https://thesieure.com" target="_blank" rel="noopener noreferrer" className="underline text-primary">thesieure.com</a> để lấy Partner ID và Partner Key.</p>
-              <Field label="Partner ID" id="card_partner_id" value={form.card_partner_id || ""} onChange={set("card_partner_id")} placeholder="Partner ID từ thesieure.com" />
-              <Field label="Partner Key" id="card_partner_key" value={form.card_partner_key || ""} onChange={set("card_partner_key")} sensitive placeholder="Partner Key từ thesieure.com" />
+            <SettingsSection title="Thẻ cào điện thoại (gachthevip.vn)" icon={<span className="text-base">📱</span>}>
+              <p className="text-xs text-muted-foreground">Đăng ký đối tác tại <a href="https://gachthevip.vn" target="_blank" rel="noopener noreferrer" className="underline text-primary">gachthevip.vn</a> để lấy Partner ID và Partner Key.</p>
+              <Field label="Partner ID" id="card_partner_id" value={form.card_partner_id || ""} onChange={set("card_partner_id")} placeholder="Partner ID từ gachthevip.vn" />
+              <Field label="Partner Key" id="card_partner_key" value={form.card_partner_key || ""} onChange={set("card_partner_key")} sensitive placeholder="Partner Key từ gachthevip.vn" />
+              <div className="space-y-1">
+                <p className="text-xs font-medium">Callback URL (nhập vào gachthevip.vn):</p>
+                <div className="flex items-center gap-2 bg-muted border rounded px-3 py-2 font-mono text-xs break-all">
+                  <span className="flex-1 select-all">{`${window.location.origin}/api/wallet/cards/callback`}</span>
+                  <button type="button" className="shrink-0 hover:text-primary transition-colors"
+                    onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/wallet/cards/callback`)}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                  </button>
+                </div>
+              </div>
             </SettingsSection>
             <Button onClick={() => save(BANK_KEYS)} disabled={saving} className="gap-2">
               <Save className="w-4 h-4" />{saving ? "Đang lưu..." : "Lưu cài đặt SePay/Bank & Thẻ cào"}

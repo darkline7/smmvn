@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem,
   SelectTrigger, SelectValue,
@@ -64,6 +65,7 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
   const [catId, setCatId] = useState("");
   const [serviceId, setServiceId] = useState<number | null>(null);
   const [link, setLink] = useState("");
+  const [comments, setComments] = useState("");
   const [quantity, setQuantity] = useState(100);
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
@@ -198,8 +200,12 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
       toast({ variant: "destructive", title: "Số dư không đủ", description: "Vui lòng nạp thêm tiền." });
       return;
     }
+    if (selectedService?.type === "custom_comments" && !comments.trim()) {
+      toast({ variant: "destructive", title: "Vui lòng nhập nội dung bình luận" });
+      return;
+    }
     createOrderMut.mutate(
-      { data: { serviceId: serviceId!, link: link.trim(), quantity } },
+      { data: { serviceId: serviceId!, link: link.trim(), quantity, ...(comments.trim() ? { comments: comments.trim() } : {}) } },
       {
         onSuccess: () => {
           toast({ title: "Đặt hàng thành công!", description: "Đơn hàng đang được xử lý." });
@@ -357,6 +363,21 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
           </Button>
         </div>
       </div>
+
+      {/* Comments field — only for custom_comments services */}
+      {selectedService?.type === "custom_comments" && (
+        <div className="space-y-1">
+          <Label className="text-sm font-medium">Nội dung bình luận</Label>
+          <Textarea
+            className="bg-background min-h-[120px] resize-y font-mono text-sm"
+            placeholder={"Nhập mỗi bình luận trên một dòng...\nVí dụ:\nBình luận 1\nBình luận 2"}
+            value={comments}
+            onChange={e => setComments(e.target.value)}
+            rows={5}
+          />
+          <p className="text-xs text-muted-foreground">{comments.split("\n").filter(Boolean).length} bình luận — mỗi dòng là 1 comment</p>
+        </div>
+      )}
 
       {/* 6. Quantity */}
       <div className="space-y-1">

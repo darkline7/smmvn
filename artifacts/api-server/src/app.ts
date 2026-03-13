@@ -7,7 +7,7 @@ import router from "./routes/index.js";
 const app: Express = express();
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.SECRET_SALT || "smm-panel-salt-2024";
-const COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
+const COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 30 days
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
@@ -34,7 +34,7 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 
 export function setSession(req: Request, res: Response, data: SessionData | null) {
   if (data === null) {
-    res.clearCookie("sid", { httpOnly: true, sameSite: "lax" });
+    res.clearCookie("sid", { httpOnly: true, sameSite: "lax", path: "/" });
     (req as any)._session = undefined;
   } else {
     const token = jwt.sign(
@@ -45,6 +45,8 @@ export function setSession(req: Request, res: Response, data: SessionData | null
     res.cookie("sid", token, {
       httpOnly: true,
       sameSite: "lax",
+      path: "/",
+      secure: req.secure || req.headers["x-forwarded-proto"] === "https",
       maxAge: COOKIE_MAX_AGE_SECONDS * 1000,
     });
     (req as any)._session = { userId: data.userId, userRole: data.userRole };

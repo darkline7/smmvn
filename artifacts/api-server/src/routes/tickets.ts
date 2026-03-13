@@ -5,6 +5,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
 import { z } from "zod";
+import { notifyNewTicket } from "../lib/telegram.js";
 
 const router = Router();
 
@@ -39,6 +40,9 @@ router.post("/", requireAuth as any, async (req: AuthRequest, res: any) => {
       message: data.message,
       isAdmin: false,
     });
+
+    // Notify admin via Telegram (fire-and-forget)
+    notifyNewTicket({ id: ticket.id, userId: req.userId!, subject: data.subject }).catch(() => {});
     
     return res.status(201).json(ticket);
   } catch (e: any) {

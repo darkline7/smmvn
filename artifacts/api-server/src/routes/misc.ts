@@ -181,7 +181,7 @@ async function syncOneProvider(provider: typeof providersTable.$inferSelect): Pr
   }
 }
 
-// GET /api/cron/sync-all?secret=xxx  — sync all active providers
+// GET /api/cron/sync-all?secret=xxx  — sync all active providers + return stats
 router.get("/cron/sync-all", async (req, res) => {
   try {
     const settings = await getSettings();
@@ -195,7 +195,33 @@ router.get("/cron/sync-all", async (req, res) => {
       provider: providers[i].name,
       ...(r.status === "fulfilled" ? r.value : { error: String(r.reason) }),
     }));
-    return res.json({ success: true, synced: providers.length, results: summary, timestamp: new Date().toISOString() });
+
+    // Fetch DB stats and provider balances
+    const [{ catCount }] = await db.select({ catCount: sql<number>`count(*)` }).from(categoriesTable);
+    const [{ svcCount }] = await db.select({ svcCount: sql<number>`count(*)` }).from(servicesTable);
+
+    // Fetch balance from each provider (parallel, best-effort, short timeout)
+    const balances = await Promise.allSettled(providers.map(async (p) => {
+      try {
+        const resp = await callProviderApi(p.baseUrl, p.apiKey, { action: "balance" }, 15000);
+        const data = await resp.json() as any;
+        return { provider: p.name, balance: data.balance ?? data.Balance ?? "-", currency: data.currency ?? "USD" };
+      } catch {
+        return { provider: p.name, balance: "-", currency: "USD" };
+      }
+    }));
+
+    return res.json({
+      success: true,
+      synced: providers.length,
+      stats: {
+        totalCategories: Number(catCount),
+        totalServices: Number(svcCount),
+        providerBalances: balances.map(r => r.status === "fulfilled" ? r.value : { balance: "-" }),
+      },
+      results: summary,
+      timestamp: new Date().toISOString(),
+    });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }

@@ -1,52 +1,57 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import jwt from "jsonwebtoken";
 import router from "./routes/index.js";
 
 const app: Express = express();
+
+const JWT_SECRET = process.env.JWT_SECRET || process.env.SECRET_SALT || "smm-panel-salt-2024";
+const COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-const sessions = new Map<string, { userId: number; userRole: string; expires: number }>();
-
-function generateSessionId(): string {
-  return crypto.randomUUID();
+interface SessionData {
+  userId: number;
+  userRole: string;
 }
 
 app.use((req: Request, _res: Response, next: NextFunction) => {
-  const sessionId = req.cookies?.sid;
-  if (sessionId && sessions.has(sessionId)) {
-    const s = sessions.get(sessionId)!;
-    if (s.expires > Date.now()) {
-      (req as any)._session = s;
-      (req as any)._sessionId = sessionId;
-    } else {
-      sessions.delete(sessionId);
+  const token = req.cookies?.sid;
+  if (token) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET) as SessionData;
+      (req as any)._session = { userId: payload.userId, userRole: payload.userRole };
+    } catch {
+      // expired or invalid token — session stays undefined
     }
   }
   next();
 });
 
-export function setSession(req: Request, res: Response, data: { userId: number; userRole: string } | null) {
+export function setSession(req: Request, res: Response, data: SessionData | null) {
   if (data === null) {
-    const sid = (req as any)._sessionId;
-    if (sid) sessions.delete(sid);
-    res.clearCookie("sid");
+    res.clearCookie("sid", { httpOnly: true, sameSite: "lax" });
     (req as any)._session = undefined;
   } else {
-    const sid = generateSessionId();
-    const sessionData = { userId: data.userId, userRole: data.userRole, expires: Date.now() + 7 * 24 * 60 * 60 * 1000 };
-    sessions.set(sid, sessionData);
-    res.cookie("sid", sid, { httpOnly: true, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000 });
-    (req as any)._session = sessionData;
-    (req as any)._sessionId = sid;
+    const token = jwt.sign(
+      { userId: data.userId, userRole: data.userRole },
+      JWT_SECRET,
+      { expiresIn: COOKIE_MAX_AGE_SECONDS }
+    );
+    res.cookie("sid", token, {
+      httpOnly: true,
+      sameSite: "lax",
+      maxAge: COOKIE_MAX_AGE_SECONDS * 1000,
+    });
+    (req as any)._session = { userId: data.userId, userRole: data.userRole };
   }
 }
 
-export function getSession(req: Request): { userId: number; userRole: string } | undefined {
+export function getSession(req: Request): SessionData | undefined {
   return (req as any)._session;
 }
 

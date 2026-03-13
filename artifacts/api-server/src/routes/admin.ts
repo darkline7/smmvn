@@ -225,34 +225,47 @@ router.delete("/categories/:id", async (req: AuthRequest, res: any) => {
 
 // PROVIDERS
 router.get("/providers", async (req: AuthRequest, res: any) => {
-  const providers = await db.select({
+  const rows = await db.select({
     id: providersTable.id, name: providersTable.name, baseUrl: providersTable.baseUrl,
     status: providersTable.status, notes: providersTable.notes, createdAt: providersTable.createdAt,
     serviceCount: sql<number>`(SELECT COUNT(*) FROM services WHERE provider_id = providers.id)`,
+    balance: providersTable.notes, // will be overridden below
   }).from(providersTable).orderBy(providersTable.name);
+  // Map baseUrl -> url so frontend receives the expected field name
+  const providers = rows.map(({ baseUrl, balance: _b, ...rest }) => ({ ...rest, url: baseUrl }));
   return res.json({ providers });
 });
 
 router.post("/providers", async (req: AuthRequest, res: any) => {
   try {
-    const [provider] = await db.insert(providersTable).values(req.body).returning();
-    const { apiKey, ...safe } = provider;
-    return res.status(201).json(safe);
+    const { url, apiKey, name, notes } = req.body;
+    const [provider] = await db.insert(providersTable).values({
+      name, baseUrl: url, apiKey, notes: notes || "",
+    }).returning();
+    const { apiKey: _ak, baseUrl: _bu, ...safe } = provider;
+    return res.status(201).json({ ...safe, url });
   } catch (e: any) {
     return res.status(400).json({ error: e.message });
   }
 });
 
 router.patch("/providers/:id", async (req: AuthRequest, res: any) => {
-  const updated = await db.update(providersTable).set({ ...req.body, updatedAt: new Date() }).where(eq(providersTable.id, Number(req.params.id))).returning();
+  const { url, apiKey, name, notes, status } = req.body;
+  const updateData: any = { updatedAt: new Date() };
+  if (name !== undefined) updateData.name = name;
+  if (url !== undefined) updateData.baseUrl = url;
+  if (apiKey && apiKey.trim()) updateData.apiKey = apiKey; // only update if non-empty
+  if (notes !== undefined) updateData.notes = notes;
+  if (status !== undefined) updateData.status = status;
+  const updated = await db.update(providersTable).set(updateData).where(eq(providersTable.id, Number(req.params.id))).returning();
   if (!updated[0]) return res.status(404).json({ error: "Not found" });
-  const { apiKey, ...safe } = updated[0];
-  return res.json(safe);
+  const { apiKey: _ak, baseUrl, ...safe } = updated[0];
+  return res.json({ ...safe, url: baseUrl });
 });
 
 router.delete("/providers/:id", async (req: AuthRequest, res: any) => {
-  await db.update(providersTable).set({ status: "inactive" }).where(eq(providersTable.id, Number(req.params.id)));
-  return res.json({ success: true, message: "Provider deactivated" });
+  await db.delete(providersTable).where(eq(providersTable.id, Number(req.params.id)));
+  return res.json({ success: true });
 });
 
 router.post("/providers/:id/test", async (req: AuthRequest, res: any) => {
@@ -262,13 +275,18 @@ router.post("/providers/:id/test", async (req: AuthRequest, res: any) => {
     const resp = await fetch(`${provider[0].baseUrl}`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `key=${provider[0].apiKey}&action=balance`,
-      signal: AbortSignal.timeout(10000),
+      body: `key=${encodeURIComponent(provider[0].apiKey)}&action=balance`,
+      signal: AbortSignal.timeout(12000),
     });
     const data: any = await resp.json();
-    return res.json({ success: true, message: "Connection successful", balance: data?.balance });
+    if (data?.balance !== undefined) {
+      // Update balance in notes for display
+      await db.update(providersTable).set({ status: "active", updatedAt: new Date() }).where(eq(providersTable.id, provider[0].id));
+      return res.json({ success: true, balance: data.balance });
+    }
+    return res.json({ success: false, error: data?.error || "Không nhận được số dư từ provider" });
   } catch (e: any) {
-    return res.json({ success: false, message: e.message });
+    return res.json({ success: false, error: e.message });
   }
 });
 
@@ -279,30 +297,39 @@ router.post("/providers/:id/sync", async (req: AuthRequest, res: any) => {
     const resp = await fetch(`${provider[0].baseUrl}`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `key=${provider[0].apiKey}&action=services`,
+      body: `key=${encodeURIComponent(provider[0].apiKey)}&action=services`,
       signal: AbortSignal.timeout(30000),
     });
     const services: any[] = await resp.json();
-    if (!Array.isArray(services)) return res.json({ synced: 0, message: "No services returned from provider" });
-    
+    if (!Array.isArray(services)) return res.json({ synced: 0, message: "Provider không trả về danh sách dịch vụ" });
+
+    // Get or create a default category for this provider
+    let cat = await db.select().from(categoriesTable).where(eq(categoriesTable.name, provider[0].name)).limit(1);
+    if (!cat[0]) {
+      const [newCat] = await db.insert(categoriesTable).values({ name: provider[0].name, description: `Dịch vụ từ ${provider[0].name}`, sortOrder: 99 }).returning();
+      cat = [newCat];
+    }
+    const categoryId = cat[0].id;
+
     let synced = 0;
-    for (const s of services.slice(0, 500)) {
+    for (const s of services.slice(0, 1000)) {
       try {
         await db.insert(servicesTable).values({
-          categoryId: 1,
-          name: s.name || `Service ${s.service}`,
+          categoryId,
+          name: s.name || `Service #${s.service}`,
+          description: s.category || "",
           providerId: provider[0].id,
           providerServiceId: String(s.service),
           type: "default",
-          rate: String(Number(s.rate) * 1.2),
+          rate: Number((Number(s.rate) * 1.25).toFixed(6)).toString(),
           min: Number(s.min) || 10,
-          max: Number(s.max) || 10000,
+          max: Number(s.max) || 100000,
           status: "inactive",
         }).onConflictDoNothing();
         synced++;
       } catch {}
     }
-    return res.json({ synced, message: `Synced ${synced} services from provider` });
+    return res.json({ synced, message: `Đã đồng bộ ${synced} dịch vụ từ ${provider[0].name}` });
   } catch (e: any) {
     return res.json({ synced: 0, message: e.message });
   }

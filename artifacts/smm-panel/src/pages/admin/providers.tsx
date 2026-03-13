@@ -13,24 +13,34 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { ShieldCheck, Plus, RefreshCw, Wifi, WifiOff, PlayCircle, Edit2, Trash2, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 
-const schema = z.object({
-  name: z.string().min(2),
+const createSchema = z.object({
+  name: z.string().min(2, "Tên tối thiểu 2 ký tự"),
   url: z.string().url("URL không hợp lệ"),
-  apiKey: z.string().min(4),
+  apiKey: z.string().min(4, "API key tối thiểu 4 ký tự"),
+});
+const editSchema = z.object({
+  name: z.string().min(2, "Tên tối thiểu 2 ký tự"),
+  url: z.string().url("URL không hợp lệ"),
+  apiKey: z.string().optional(),
 });
 
 function ProviderForm({ provider, onDone }: { provider?: any; onDone: () => void }) {
   const { toast } = useToast();
-  const form = useForm<z.infer<typeof schema>>({
+  const schema = provider ? editSchema : createSchema;
+  const form = useForm<any>({
     resolver: zodResolver(schema),
-    defaultValues: provider ? { name: provider.name, url: provider.url, apiKey: provider.apiKey } : { name: "", url: "", apiKey: "" },
+    defaultValues: provider ? { name: provider.name, url: provider.url, apiKey: "" } : { name: "", url: "", apiKey: "" },
   });
 
-  const onSubmit = async (values: z.infer<typeof schema>) => {
+  const onSubmit = async (values: any) => {
     const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
-    const url = provider ? `${BASE}/api/admin/providers/${provider.id}` : `${BASE}/api/admin/providers`;
-    const res = await fetch(url, { method: provider ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(values) });
-    if (!res.ok) { toast({ title: "Lỗi lưu provider", variant: "destructive" }); return; }
+    const endpoint = provider ? `${BASE}/api/admin/providers/${provider.id}` : `${BASE}/api/admin/providers`;
+    const res = await fetch(endpoint, { method: provider ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(values) });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast({ title: "Lỗi lưu provider", description: err.error || "Vui lòng thử lại", variant: "destructive" });
+      return;
+    }
     toast({ title: "Lưu thành công!" }); onDone();
   };
 
@@ -42,10 +52,15 @@ function ProviderForm({ provider, onDone }: { provider?: any; onDone: () => void
         )} />
         <FormField control={form.control} name="url" render={({ field }) => (
           <FormItem><FormLabel>API URL</FormLabel><FormControl><Input placeholder="https://provider.com/api/v2" {...field} /></FormControl>
-            <FormDescription>URL endpoint API v2 của provider</FormDescription><FormMessage /></FormItem>
+            <FormDescription>URL endpoint API v2 (thường kết thúc bằng /api/v2)</FormDescription><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="apiKey" render={({ field }) => (
-          <FormItem><FormLabel>API Key</FormLabel><FormControl><Input type="password" placeholder="API key của provider" {...field} /></FormControl><FormMessage /></FormItem>
+          <FormItem>
+            <FormLabel>API Key</FormLabel>
+            <FormControl><Input type="password" placeholder={provider ? "Để trống nếu không đổi key" : "API key của provider"} {...field} /></FormControl>
+            {provider && <FormDescription>Chỉ nhập nếu muốn cập nhật key mới</FormDescription>}
+            <FormMessage />
+          </FormItem>
         )} />
         <Button type="submit" className="w-full">{provider ? "Cập nhật" : "Thêm provider"}</Button>
       </form>

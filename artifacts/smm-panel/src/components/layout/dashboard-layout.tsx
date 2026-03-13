@@ -6,7 +6,7 @@ import {
   Wallet, Receipt, Ticket as TicketIcon, Key, 
   User, Bell, LogOut, Menu, X, Users, Shield, Settings,
   Database, Activity, Volume2, ShieldCheck, CreditCard,
-  Zap, RefreshCw, UserPlus, Grid3X3
+  Zap, RefreshCw, UserPlus, Grid3X3, Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ const userNav: SidebarItem[] = [
   { title: "Lịch sử giao dịch", href: "/transactions", icon: Receipt },
   { title: "Hỗ trợ", href: "/tickets", icon: TicketIcon },
   { title: "API", href: "/api", icon: Key },
+  { title: "Tạo web con", href: "/subdomains", icon: Grid3X3 },
   { title: "Giới thiệu", href: "/referrals", icon: UserPlus },
   { title: "Thông báo", href: "/notifications", icon: Bell },
   { title: "Hồ sơ", href: "/profile", icon: User },
@@ -42,6 +43,7 @@ const adminNav: SidebarItem[] = [
   { title: "Providers", href: "/admin/providers", icon: ShieldCheck },
   { title: "Nạp tiền", href: "/admin/payments", icon: CreditCard },
   { title: "Hỗ trợ", href: "/admin/tickets", icon: TicketIcon },
+  { title: "Web con", href: "/admin/subdomains", icon: Globe },
   { title: "Thông báo HT", href: "/admin/announcements", icon: Volume2 },
   { title: "API Logs", href: "/admin/api-logs", icon: Grid3X3 },
   { title: "Cài đặt", href: "/admin/settings", icon: Settings },

@@ -6,3 +6,4 @@ export * from "./orders";
 export * from "./transactions";
 export * from "./tickets";
 export * from "./misc";
+export * from "./subdomains";

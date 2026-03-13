@@ -60,6 +60,7 @@ const ServicesList = lazy(() => import("./pages/dashboard/services-list"));
 const MassOrder = lazy(() => import("./pages/dashboard/mass-order"));
 const DripFeed = lazy(() => import("./pages/dashboard/drip-feed"));
 const Subscriptions = lazy(() => import("./pages/dashboard/subscriptions"));
+const SubdomainsPage = lazy(() => import("./pages/dashboard/subdomains"));
 
 // Admin
 const AdminDashboard = lazy(() => import("./pages/admin/index"));
@@ -73,6 +74,7 @@ const AdminAnnouncements = lazy(() => import("./pages/admin/announcements"));
 const AdminApiLogs = lazy(() => import("./pages/admin/api-logs"));
 const AdminSettings = lazy(() => import("./pages/admin/settings"));
 const AdminProviders = lazy(() => import("./pages/admin/providers"));
+const AdminSubdomains = lazy(() => import("./pages/admin/subdomains"));
 
 const NotFound = lazy(() => import("./pages/not-found"));
 
@@ -169,6 +171,7 @@ function Router() {
         <Route path="/mass-order" component={MassOrder} />
         <Route path="/drip-feed" component={DripFeed} />
         <Route path="/subscriptions" component={Subscriptions} />
+        <Route path="/subdomains" component={SubdomainsPage} />
 
         {/* Admin */}
         <Route path="/admin" component={AdminDashboard} />
@@ -182,6 +185,7 @@ function Router() {
         <Route path="/admin/api-logs" component={AdminApiLogs} />
         <Route path="/admin/settings" component={AdminSettings} />
         <Route path="/admin/providers" component={AdminProviders} />
+        <Route path="/admin/subdomains" component={AdminSubdomains} />
 
         <Route component={NotFound} />
       </Switch>

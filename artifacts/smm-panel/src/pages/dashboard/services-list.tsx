@@ -127,28 +127,30 @@ export default function ServicesList() {
           </Select>
         </div>
 
-        {/* Platform Filter */}
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => { setSelectedPlatform("all"); setSelectedCat("all"); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${selectedPlatform === "all" ? "bg-primary text-primary-foreground shadow-md" : "bg-muted hover:bg-muted/80 text-foreground"}`}
-          >
-            🌐 Tất cả ({totalActive.toLocaleString()})
-          </button>
-          {platforms.map(platform => {
-            const count = (catData?.categories || [])
-              .filter(c => detectPlatform(c.name) === platform)
-              .reduce((acc, c) => acc + ((c as any).serviceCount || 0), 0);
-            return (
-              <button
-                key={platform}
-                onClick={() => { setSelectedPlatform(platform); setSelectedCat("all"); }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${selectedPlatform === platform ? "bg-primary text-primary-foreground shadow-md" : "bg-muted hover:bg-muted/80 text-foreground"}`}
-              >
-                {PLATFORM_EMOJIS[platform] || "📦"} {platform} {count > 0 && <span className="opacity-70">({count.toLocaleString()})</span>}
-              </button>
-            );
-          })}
+        {/* Platform Filter — horizontal scroll, no wrap */}
+        <div className="overflow-x-auto pb-1 -mx-1 px-1">
+          <div className="flex gap-2 w-max">
+            <button
+              onClick={() => { setSelectedPlatform("all"); setSelectedCat("all"); }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedPlatform === "all" ? "bg-primary text-primary-foreground shadow-md" : "bg-muted hover:bg-muted/80 text-foreground"}`}
+            >
+              🌐 Tất cả ({totalActive.toLocaleString()})
+            </button>
+            {platforms.map(platform => {
+              const count = (catData?.categories || [])
+                .filter(c => detectPlatform(c.name) === platform)
+                .reduce((acc, c) => acc + ((c as any).serviceCount || 0), 0);
+              return (
+                <button
+                  key={platform}
+                  onClick={() => { setSelectedPlatform(platform); setSelectedCat("all"); }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedPlatform === platform ? "bg-primary text-primary-foreground shadow-md" : "bg-muted hover:bg-muted/80 text-foreground"}`}
+                >
+                  {PLATFORM_EMOJIS[platform] || "📦"} {platform} {count > 0 && <span className="opacity-70">({count})</span>}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Results */}

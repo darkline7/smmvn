@@ -47,7 +47,22 @@ export default function Dashboard() {
           </div>
         ) : null}
 
-        {/* ── Section 2: Chart + Recent Orders (desktop: side-by-side, mobile: stacked) ── */}
+        {/* ── Section 2: New Order Form ── */}
+        <Card className="border-border/50 shadow-sm">
+          <CardHeader className="pb-0 pt-5 px-5 sm:px-6 border-b border-border/30 pb-4">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5 text-primary" />
+              <CardTitle className="text-base font-semibold font-display">Đặt hàng mới</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="p-5 sm:p-6">
+            <div className="max-w-2xl relative">
+              <NewOrderForm />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Section 3: Chart + Recent Orders (bottom) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Chart */}
           <Card className="border-border/50 shadow-sm">
@@ -66,7 +81,8 @@ export default function Dashboard() {
                   <div className="flex space-x-0.5 items-end h-full w-full px-2 pb-0 pt-2">
                     {(chartData?.data || []).map((d, i) => {
                       const spendVal = Number(d.spend) || 0;
-                      const maxSpend = Math.max(...(chartData?.data || []).map(x => Number(x.spend) || 0));
+                      const allSpend = (chartData?.data || []).map(x => Number(x.spend) || 0);
+                      const maxSpend = allSpend.length > 0 ? Math.max(...allSpend) : 0;
                       const height = Math.max(6, maxSpend > 0 ? (spendVal / maxSpend) * 90 : 6);
                       return (
                         <div key={i} className="flex-1 group relative flex justify-center h-full items-end">
@@ -129,21 +145,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
-
-        {/* ── Section 3: New Order Form (full width below) ── */}
-        <Card className="border-border/50 shadow-sm">
-          <CardHeader className="pb-0 pt-5 px-5 sm:px-6 border-b border-border/30 pb-4">
-            <div className="flex items-center gap-2">
-              <ShoppingCart className="w-5 h-5 text-primary" />
-              <CardTitle className="text-base font-semibold font-display">Đặt hàng mới</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="p-5 sm:p-6">
-            <div className="max-w-2xl relative">
-              <NewOrderForm />
-            </div>
-          </CardContent>
-        </Card>
 
       </div>
     </DashboardLayout>

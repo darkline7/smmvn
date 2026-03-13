@@ -108,15 +108,28 @@ async function getSettings(): Promise<Record<string, string>> {
   return s;
 }
 
+async function callProviderApi(baseUrl: string, apiKey: string, params: Record<string, string>, timeoutMs = 60000): Promise<Response> {
+  const body = new URLSearchParams({ key: apiKey, ...params });
+  return fetch(baseUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+      "Accept": "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Cache-Control": "no-cache",
+      "Origin": baseUrl.replace(/\/api.*/, ""),
+      "Referer": baseUrl.replace(/\/api.*/, "") + "/",
+    },
+    body: body.toString(),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+}
+
 async function syncOneProvider(provider: typeof providersTable.$inferSelect): Promise<{ added: number; updated: number; total: number; error?: string }> {
   const markup = 1 + (Number(provider.markupPercent) || 25) / 100;
   try {
-    const resp = await fetch(`${provider.baseUrl}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `key=${encodeURIComponent(provider.apiKey)}&action=services`,
-      signal: AbortSignal.timeout(60000),
-    });
+    const resp = await callProviderApi(provider.baseUrl, provider.apiKey, { action: "services" }, 90000);
     const services: any[] = await resp.json();
     if (!Array.isArray(services)) return { added: 0, updated: 0, total: 0, error: "Provider không trả về danh sách" };
 

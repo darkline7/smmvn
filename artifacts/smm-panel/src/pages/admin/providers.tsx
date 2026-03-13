@@ -76,8 +76,8 @@ function ProviderForm({ provider, onDone }: { provider?: any; onDone: () => void
         <FormField control={form.control} name="url" render={({ field }) => (
           <FormItem>
             <FormLabel>API URL</FormLabel>
-            <FormControl><Input placeholder="https://provider.com/api/v2" {...field} /></FormControl>
-            <FormDescription>URL endpoint API v2 của web nguồn (thường kết thúc /api/v2)</FormDescription>
+            <FormControl><Input placeholder="https://smmgen.com/api/v2" {...field} /></FormControl>
+            <FormDescription>URL endpoint API của web nguồn. Ví dụ: https://smmgen.com/api/v2 (thường /api hoặc /api/v2)</FormDescription>
             <FormMessage />
           </FormItem>
         )} />

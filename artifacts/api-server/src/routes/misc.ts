@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { announcementsTable, notificationsTable, referralsTable, usersTable, siteSettingsTable, providersTable, servicesTable, categoriesTable } from "@workspace/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
 
@@ -104,36 +104,47 @@ async function syncOneProvider(provider: typeof providersTable.$inferSelect): Pr
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: `key=${encodeURIComponent(provider.apiKey)}&action=services`,
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(60000),
     });
     const services: any[] = await resp.json();
     if (!Array.isArray(services)) return { added: 0, updated: 0, total: 0, error: "Provider không trả về danh sách" };
 
-    let cat = await db.select().from(categoriesTable).where(eq(categoriesTable.name, provider.name)).limit(1);
-    if (!cat[0]) {
-      const [newCat] = await db.insert(categoriesTable).values({ name: provider.name, description: `Dịch vụ từ ${provider.name}`, sortOrder: 99 }).returning();
-      cat = [newCat];
-    }
-    const categoryId = cat[0].id;
+    // Category cache by name — creates from provider's own category field
+    const categoryCache: Record<string, number> = {};
+    const getOrCreateCategory = async (catName: string): Promise<number> => {
+      const key = catName.trim() || "General";
+      if (categoryCache[key]) return categoryCache[key];
+      const existing = await db.select({ id: categoriesTable.id }).from(categoriesTable).where(eq(categoriesTable.name, key)).limit(1);
+      if (existing[0]) { categoryCache[key] = existing[0].id; return existing[0].id; }
+      const [{ count: catCount }] = await db.select({ count: sql<number>`count(*)` }).from(categoriesTable);
+      const [newCat] = await db.insert(categoriesTable).values({ name: key, description: "", sortOrder: Number(catCount) + 1 }).returning();
+      categoryCache[key] = newCat.id;
+      return newCat.id;
+    };
 
     let added = 0;
     let updated = 0;
-    for (const s of services.slice(0, 2000)) {
+    for (const s of services) {  // No limit
       try {
         const providerServiceId = String(s.service);
         const newRate = Number((Number(s.rate) * markup).toFixed(6)).toString();
         const min = Number(s.min) || 10;
         const max = Number(s.max) || 100000;
+        const name = s.name || `Service #${s.service}`;
+        const categoryId = await getOrCreateCategory(s.category || "General");
+
         const existing = await db.select({ id: servicesTable.id }).from(servicesTable)
-          .where(eq(servicesTable.providerServiceId, providerServiceId)).limit(1);
+          .where(and(eq(servicesTable.providerServiceId, providerServiceId), eq(servicesTable.providerId, provider.id))).limit(1);
         if (existing[0]) {
-          await db.update(servicesTable).set({ rate: newRate, min, max, updatedAt: new Date() }).where(eq(servicesTable.id, existing[0].id));
+          await db.update(servicesTable).set({ rate: newRate, min, max, name, categoryId, status: "active", updatedAt: new Date() }).where(eq(servicesTable.id, existing[0].id));
           updated++;
         } else {
           await db.insert(servicesTable).values({
-            categoryId, name: s.name || `Service #${s.service}`, description: s.category || "",
+            categoryId, name, description: "",
             providerId: provider.id, providerServiceId, type: "default",
-            rate: newRate, min, max, status: "inactive",
+            rate: newRate, min, max, status: "active",
+            refill: s.refill === true || s.refill === "true",
+            cancel: s.cancel === true || s.cancel === "true",
           });
           added++;
         }

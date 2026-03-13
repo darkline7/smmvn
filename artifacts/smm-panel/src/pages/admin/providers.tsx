@@ -201,6 +201,7 @@ export default function AdminProviders() {
   const [openNew, setOpenNew] = useState(false);
   const [testing, setTesting] = useState<number | null>(null);
   const [syncing, setSyncing] = useState<number | "all" | null>(null);
+  const [activating, setActivating] = useState<number | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-providers"],
@@ -260,6 +261,19 @@ export default function AdminProviders() {
     } catch {
       toast({ title: "Lỗi sync tất cả", variant: "destructive" });
     } finally { setSyncing(null); }
+  };
+
+  const activateServices = async (id: number, name: string) => {
+    setActivating(id);
+    try {
+      const res = await fetch(`${BASE}/api/admin/providers/${id}/activate`, { method: "POST", credentials: "include" });
+      const d = await res.json();
+      if (d.success) toast({ title: `✅ ${d.message}` });
+      else toast({ title: "Lỗi kích hoạt", variant: "destructive" });
+      refetch();
+    } catch {
+      toast({ title: "Lỗi kích hoạt", variant: "destructive" });
+    } finally { setActivating(null); }
   };
 
   const deleteProvider = async (id: number) => {
@@ -392,6 +406,15 @@ export default function AdminProviders() {
                               >
                                 {testing === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wifi className="w-3.5 h-3.5" />}
                                 Test
+                              </Button>
+                              <Button
+                                variant="ghost" size="sm" className="gap-1 text-xs h-8 text-green-600 hover:text-green-700"
+                                disabled={activating === p.id}
+                                onClick={() => activateServices(p.id, p.name)}
+                                title="Kích hoạt tất cả dịch vụ đang inactive"
+                              >
+                                {activating === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                                Kích hoạt
                               </Button>
                               <Button
                                 variant="ghost" size="sm" className="gap-1 text-xs h-8"

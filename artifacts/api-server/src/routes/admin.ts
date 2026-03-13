@@ -295,7 +295,7 @@ router.post("/providers/:id/test", async (req: AuthRequest, res: any) => {
   }
 });
 
-// Shared sync logic — returns { added, updated, total }
+// Shared sync logic — groups services by their own category name, no limit
 async function syncProviderServices(provider: any): Promise<{ added: number; updated: number; total: number; error?: string }> {
   const markup = 1 + (Number(provider.markupPercent) || 25) / 100;
   try {
@@ -303,44 +303,64 @@ async function syncProviderServices(provider: any): Promise<{ added: number; upd
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: `key=${encodeURIComponent(provider.apiKey)}&action=services`,
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(60000),
     });
     const services: any[] = await resp.json();
     if (!Array.isArray(services)) return { added: 0, updated: 0, total: 0, error: "Provider không trả về danh sách dịch vụ" };
 
-    let cat = await db.select().from(categoriesTable).where(eq(categoriesTable.name, provider.name)).limit(1);
-    if (!cat[0]) {
-      const [newCat] = await db.insert(categoriesTable).values({ name: provider.name, description: `Dịch vụ từ ${provider.name}`, sortOrder: 99 }).returning();
-      cat = [newCat];
-    }
-    const categoryId = cat[0].id;
+    // Cache category IDs by category name to avoid N+1 queries
+    const categoryCache: Record<string, number> = {};
+    const getOrCreateCategory = async (catName: string): Promise<number> => {
+      const key = catName.trim() || "General";
+      if (categoryCache[key]) return categoryCache[key];
+      const existing = await db.select({ id: categoriesTable.id }).from(categoriesTable).where(eq(categoriesTable.name, key)).limit(1);
+      if (existing[0]) {
+        categoryCache[key] = existing[0].id;
+        return existing[0].id;
+      }
+      // Count existing categories for sort order
+      const [{ count: catCount }] = await db.select({ count: sql<number>`count(*)` }).from(categoriesTable);
+      const [newCat] = await db.insert(categoriesTable).values({
+        name: key,
+        description: "",
+        sortOrder: Number(catCount) + 1,
+      }).returning();
+      categoryCache[key] = newCat.id;
+      return newCat.id;
+    };
 
     let added = 0;
     let updated = 0;
-    for (const s of services.slice(0, 2000)) {
+    for (const s of services) {  // No limit — import ALL services
       try {
         const providerServiceId = String(s.service);
         const newRate = Number((Number(s.rate) * markup).toFixed(6)).toString();
         const min = Number(s.min) || 10;
         const max = Number(s.max) || 100000;
         const name = s.name || `Service #${s.service}`;
+        // Use provider's category name — hides source from users
+        const categoryId = await getOrCreateCategory(s.category || "General");
 
         const existing = await db.select({ id: servicesTable.id })
           .from(servicesTable)
-          .where(eq(servicesTable.providerServiceId, providerServiceId))
+          .where(and(eq(servicesTable.providerServiceId, providerServiceId), eq(servicesTable.providerId, provider.id)))
           .limit(1);
 
         if (existing[0]) {
-          // UPDATE existing: refresh price, min, max
           await db.update(servicesTable).set({
-            rate: newRate, min, max, updatedAt: new Date(),
+            rate: newRate, min, max, name, categoryId,
+            status: "active", // Re-activate if previously inactive
+            updatedAt: new Date(),
           }).where(eq(servicesTable.id, existing[0].id));
           updated++;
         } else {
           await db.insert(servicesTable).values({
-            categoryId, name, description: s.category || "",
+            categoryId, name, description: "",
             providerId: provider.id, providerServiceId, type: "default",
-            rate: newRate, min, max, status: "inactive",
+            rate: newRate, min, max,
+            status: "active",  // Active immediately so users can see and order
+            refill: s.refill === true || s.refill === "true",
+            cancel: s.cancel === true || s.cancel === "true",
           });
           added++;
         }
@@ -360,6 +380,16 @@ router.post("/providers/:id/sync", async (req: AuthRequest, res: any) => {
   const result = await syncProviderServices(provider);
   if (result.error) return res.json({ success: false, ...result });
   return res.json({ success: true, ...result, message: `Thêm ${result.added} mới, cập nhật giá ${result.updated} dịch vụ từ ${provider.name}` });
+});
+
+// Activate all inactive services for a provider instantly (no re-sync needed)
+router.post("/providers/:id/activate", async (req: AuthRequest, res: any) => {
+  const id = Number(req.params.id);
+  const result = await db.update(servicesTable)
+    .set({ status: "active", updatedAt: new Date() })
+    .where(and(eq(servicesTable.providerId, id), eq(servicesTable.status, "inactive")));
+  const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(servicesTable).where(eq(servicesTable.providerId, id));
+  return res.json({ success: true, activated: Number(count), message: `Đã kích hoạt dịch vụ. Tổng: ${count}` });
 });
 
 // Sync all active providers — for cron

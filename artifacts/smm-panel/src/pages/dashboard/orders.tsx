@@ -98,69 +98,71 @@ export default function Orders() {
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[80px]">ID</TableHead>
-                  <TableHead className="w-[120px]">Date</TableHead>
-                  <TableHead className="min-w-[200px]">Service & Link</TableHead>
-                  <TableHead className="text-right">Charge</TableHead>
-                  <TableHead className="text-center">Count / Remains</TableHead>
-                  <TableHead className="w-[120px]">Status</TableHead>
-                  <TableHead className="text-right w-[100px]">Action</TableHead>
+                <TableRow className="text-xs">
+                  <TableHead className="w-[60px]">ID</TableHead>
+                  <TableHead className="w-[130px]">Ngày</TableHead>
+                  <TableHead className="min-w-[160px]">Dịch vụ</TableHead>
+                  <TableHead className="min-w-[160px]">Link</TableHead>
+                  <TableHead className="text-right w-[80px]">Charge</TableHead>
+                  <TableHead className="text-center w-[70px]">Start</TableHead>
+                  <TableHead className="text-center w-[70px]">Số lượng</TableHead>
+                  <TableHead className="text-center w-[70px]">Remains</TableHead>
+                  <TableHead className="w-[110px]">Trạng thái</TableHead>
+                  <TableHead className="text-right w-[80px]">Thao tác</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   Array.from({length: 5}).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={7} className="h-16">
+                      <TableCell colSpan={10} className="h-16">
                         <div className="animate-pulse bg-secondary h-6 w-full rounded"></div>
                       </TableCell>
                     </TableRow>
                   ))
                 ) : data?.orders.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                      No orders found matching your criteria.
+                    <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                      Không tìm thấy đơn hàng nào.
                     </TableCell>
                   </TableRow>
                 ) : (
                   data?.orders.map((order) => (
-                    <TableRow key={order.id} className="group">
-                      <TableCell className="font-mono font-medium">{order.id}</TableCell>
+                    <TableRow key={order.id} className="group text-sm">
+                      <TableCell className="font-mono font-semibold text-primary">{order.id}</TableCell>
                       <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
-                        {format(new Date(order.createdAt), "MMM dd, yyyy HH:mm")}
+                        {format(new Date(order.createdAt), "dd/MM/yy HH:mm")}
                       </TableCell>
+                      <TableCell className="max-w-[200px]">
+                        <span className="block truncate font-medium text-foreground text-xs" title={order.serviceName}>
+                          {order.serviceName}
+                        </span>
+                      </TableCell>
+                      <TableCell className="max-w-[200px]">
+                        <a href={order.link} target="_blank" rel="noopener noreferrer"
+                          className="text-xs text-primary hover:underline flex items-center gap-1 truncate w-fit max-w-full"
+                          title={order.link}>
+                          {order.link} <ExternalLink className="h-3 w-3 inline shrink-0" />
+                        </a>
+                      </TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">${Number(order.charge||0).toFixed(2)}</TableCell>
+                      <TableCell className="text-center tabular-nums text-muted-foreground">{order.startCount ?? '-'}</TableCell>
+                      <TableCell className="text-center tabular-nums font-medium">{order.quantity ?? '-'}</TableCell>
+                      <TableCell className="text-center tabular-nums text-muted-foreground">{order.remains ?? '-'}</TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-1 max-w-[300px]">
-                          <span className="font-medium text-foreground truncate" title={order.serviceName}>
-                            {order.serviceName}
-                          </span>
-                          <a href={order.link} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1 truncate w-fit max-w-full">
-                            {order.link} <ExternalLink className="h-3 w-3 inline shrink-0" />
-                          </a>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">${Number(order.charge||0).toFixed(2)}</TableCell>
-                      <TableCell className="text-center text-sm">
-                        <div className="flex flex-col items-center">
-                           <span className="text-foreground">{order.startCount || '-'}</span>
-                           <span className="text-xs text-muted-foreground">Rem: {order.remains !== undefined ? order.remains : '-'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusColor(order.status) as any} className="capitalize px-2 py-0.5 shadow-sm">
+                        <Badge variant={getStatusColor(order.status) as any} className="capitalize text-xs px-2 py-0.5 shadow-sm">
                           {order.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right space-x-1 whitespace-nowrap">
                         {order.status === 'completed' && (
-                          <Button size="icon" variant="outline" className="h-8 w-8 text-primary" onClick={() => handleRefill(order.id)} title="Request Refill" disabled={refillMut.isPending}>
-                            <RefreshCw className="h-4 w-4" />
+                          <Button size="icon" variant="outline" className="h-7 w-7 text-primary" onClick={() => handleRefill(order.id)} title="Request Refill" disabled={refillMut.isPending}>
+                            <RefreshCw className="h-3.5 w-3.5" />
                           </Button>
                         )}
                         {(order.status === 'pending' || order.status === 'processing') && (
-                          <Button size="icon" variant="outline" className="h-8 w-8 text-destructive" onClick={() => handleCancel(order.id)} title="Request Cancel" disabled={cancelMut.isPending}>
-                            <XCircle className="h-4 w-4" />
+                          <Button size="icon" variant="outline" className="h-7 w-7 text-destructive" onClick={() => handleCancel(order.id)} title="Request Cancel" disabled={cancelMut.isPending}>
+                            <XCircle className="h-3.5 w-3.5" />
                           </Button>
                         )}
                       </TableCell>

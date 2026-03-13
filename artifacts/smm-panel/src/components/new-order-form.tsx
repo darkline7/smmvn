@@ -43,18 +43,15 @@ const PLATFORM_EMOJI: Record<string, string> = {
   Kick: "⚡", Threads: "🧵", SoundCloud: "☁️", "Website/SEO": "🌐", "Khác": "📦",
 };
 
-const PLATFORM_ORDER = ["Instagram", "Facebook", "TikTok", "YouTube", "Twitter/X", "Telegram", "Spotify", "Discord"];
+const PLATFORM_ORDER: string[] = [];
 
 function formatNum(n: number) {
   return new Intl.NumberFormat("vi-VN").format(n);
 }
 
 function calcVND(usd: number, rate: number) {
-  const vnd = usd * rate;
-  if (vnd < 1000) return `${Math.ceil(vnd)}đ`;
-  const thousands = Math.ceil(vnd / 1000);
-  if (thousands >= 1000) return `${(vnd / 1_000_000).toFixed(2)}Mđ`;
-  return `${thousands.toLocaleString("vi-VN")}kđ`;
+  const vnd = Math.ceil(usd * rate);
+  return `${vnd.toLocaleString("vi-VN")}đ`;
 }
 
 export function NewOrderForm({ compact = false }: { compact?: boolean }) {
@@ -96,17 +93,15 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
   });
   const allCategories: any[] = catData?.categories || [];
 
-  // Platforms derived from categories
+  // Platforms — preserve source provider order (no re-sort)
   const platforms = useMemo(() => {
-    const set = new Set<string>();
-    allCategories.forEach((c: any) => set.add(detectPlatform(c.name)));
-    return Array.from(set).sort((a, b) => {
-      const ai = PLATFORM_ORDER.indexOf(a), bi = PLATFORM_ORDER.indexOf(b);
-      if (ai === -1 && bi === -1) return a.localeCompare(b);
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
-    });
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const c of allCategories) {
+      const p = detectPlatform(c.name);
+      if (!seen.has(p)) { seen.add(p); result.push(p); }
+    }
+    return result;
   }, [allCategories]);
 
   // Filtered categories by selected platform

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { announcementsTable, notificationsTable, referralsTable, usersTable, siteSettingsTable, providersTable, servicesTable, categoriesTable } from "@workspace/db/schema";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { announcementsTable, notificationsTable, referralsTable, usersTable, siteSettingsTable, providersTable, servicesTable, categoriesTable, ordersTable, orderLogsTable } from "@workspace/db/schema";
+import { eq, desc, sql, and, inArray, isNotNull } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
 
@@ -213,6 +213,94 @@ router.get("/cron/sync/:id", async (req, res) => {
     if (!provider) return res.status(404).json({ error: "Provider not found" });
     const result = await syncOneProvider(provider);
     return res.json({ success: !result.error, provider: provider.name, ...result, timestamp: new Date().toISOString() });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/cron/update-orders?secret=xxx  — update order statuses from providers
+router.get("/cron/update-orders", async (req, res) => {
+  try {
+    const settings = await getSettings();
+    const cronSecret = settings["cron_secret"] || "";
+    if (!cronSecret || req.query.secret !== cronSecret) {
+      return res.status(401).json({ error: "Invalid cron secret" });
+    }
+
+    // Fetch pending/processing orders with providerOrderId
+    const pendingOrders = await db.select({
+      id: ordersTable.id,
+      providerId: servicesTable.providerId,
+      providerOrderId: ordersTable.providerOrderId,
+      status: ordersTable.status,
+    })
+      .from(ordersTable)
+      .innerJoin(servicesTable, eq(servicesTable.id, ordersTable.serviceId))
+      .where(and(
+        inArray(ordersTable.status, ["pending", "processing"]),
+        isNotNull(ordersTable.providerOrderId),
+      ))
+      .limit(200);
+
+    if (!pendingOrders.length) {
+      return res.json({ success: true, message: "No pending orders to update", updated: 0 });
+    }
+
+    // Group by provider
+    const byProvider: Record<number, typeof pendingOrders> = {};
+    for (const o of pendingOrders) {
+      if (!o.providerId) continue;
+      if (!byProvider[o.providerId]) byProvider[o.providerId] = [];
+      byProvider[o.providerId].push(o);
+    }
+
+    const STATUS_MAP: Record<string, string> = {
+      "Pending": "pending", "Processing": "processing", "In progress": "processing",
+      "Active": "active", "Completed": "completed", "Partial": "partial",
+      "Cancelled": "cancelled", "Canceled": "cancelled", "Failed": "failed",
+    };
+
+    let updated = 0;
+    for (const [providerIdStr, orders] of Object.entries(byProvider)) {
+      try {
+        const [provider] = await db.select().from(providersTable).where(eq(providersTable.id, Number(providerIdStr))).limit(1);
+        if (!provider?.baseUrl || !provider?.apiKey) continue;
+
+        // Batch up to 100 order IDs per call
+        const chunks: typeof orders[] = [];
+        for (let i = 0; i < orders.length; i += 100) chunks.push(orders.slice(i, i + 100));
+
+        for (const chunk of chunks) {
+          const ids = chunk.map(o => o.providerOrderId!).join(",");
+          const resp = await callProviderApi(provider.baseUrl, provider.apiKey, { action: "status", orders: ids }, 30000);
+          const data = await resp.json() as Record<string, any>;
+
+          for (const o of chunk) {
+            const info = data[o.providerOrderId!];
+            if (!info) continue;
+            const newStatus = STATUS_MAP[info.status] || o.status;
+            const startCount = info.start_count != null ? Number(info.start_count) : undefined;
+            const remains = info.remains != null ? Number(info.remains) : undefined;
+            if (newStatus !== o.status || startCount !== undefined || remains !== undefined) {
+              await db.update(ordersTable).set({
+                status: newStatus as any,
+                ...(startCount !== undefined ? { startCount } : {}),
+                ...(remains !== undefined ? { remains } : {}),
+                updatedAt: new Date(),
+              }).where(eq(ordersTable.id, o.id));
+              if (newStatus !== o.status) {
+                await db.insert(orderLogsTable).values({ orderId: o.id, status: newStatus, note: `Auto-updated from provider` });
+              }
+              updated++;
+            }
+          }
+        }
+      } catch (provErr: any) {
+        console.error(`[cron/update-orders] Provider ${providerIdStr} error:`, provErr.message);
+      }
+    }
+
+    return res.json({ success: true, checked: pendingOrders.length, updated, timestamp: new Date().toISOString() });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }

@@ -481,8 +481,28 @@ export default function AdminSettings() {
               </div>
             </SettingsSection>
 
-            <SettingsSection title="Cron Secret" description="Bảo vệ link tự động cập nhật giá" icon={<Lock className="w-4 h-4" />}>
-              <Field label="Cron Secret Key" id="cron_secret" value={form.cron_secret || ""} onChange={set("cron_secret")} sensitive placeholder="MySecretCron2025!" description="Dán vào cron link: /api/cron/sync-all?secret=YOUR_SECRET" />
+            <SettingsSection title="Cron Secret" description="Bảo vệ link tự động cập nhật" icon={<Lock className="w-4 h-4" />}>
+              <Field label="Cron Secret Key" id="cron_secret" value={form.cron_secret || ""} onChange={set("cron_secret")} sensitive placeholder="MySecretCron2025!" description="Key để bảo vệ các Cron Links bên dưới" />
+              {form.cron_secret && (
+                <div className="space-y-2 mt-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cron Links (dùng cho cron-job.org):</p>
+                  {[
+                    { label: "Đồng bộ tất cả dịch vụ", path: "/api/cron/sync-all" },
+                    { label: "Cập nhật trạng thái đơn hàng", path: "/api/cron/update-orders" },
+                  ].map(({ label, path }) => (
+                    <div key={path} className="text-xs space-y-0.5">
+                      <p className="text-muted-foreground">{label}:</p>
+                      <div className="flex items-center gap-2 bg-muted border rounded px-3 py-2 font-mono break-all">
+                        <span className="flex-1 select-all">{`${window.location.origin}${path}?secret=${form.cron_secret}`}</span>
+                        <button type="button" className="shrink-0 hover:text-primary transition-colors"
+                          onClick={() => navigator.clipboard.writeText(`${window.location.origin}${path}?secret=${form.cron_secret}`)}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </SettingsSection>
 
             <SettingsSection title="API Endpoint" icon={<Globe className="w-4 h-4" />}>

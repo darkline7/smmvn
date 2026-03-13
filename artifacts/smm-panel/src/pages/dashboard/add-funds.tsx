@@ -329,7 +329,7 @@ export default function AddFunds() {
               <Info className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-amber-700 dark:text-amber-300">
                 <strong>Nạp thẻ cào điện thoại</strong> – Hỗ trợ Viettel, MobiFone, Vinaphone, Vietnamobile, Gmobile, Reddi.
-                Thẻ được xử lý tự động qua đối tác <strong>thesieure.com</strong>. Thẻ lỗi/sai mệnh giá sẽ bị trừ phí.
+                Thẻ lỗi/sai mệnh giá sẽ bị trừ phí theo quy định.
               </div>
             </div>
             <div className="grid md:grid-cols-2 gap-6">

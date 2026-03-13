@@ -82,4 +82,17 @@ router.post("/forgot-password", async (_req: Request, res: Response) => {
   return res.json({ success: true, message: "If that email exists, a reset link will be sent" });
 });
 
+router.post("/make-admin", async (req: Request, res: Response) => {
+  const { email, setupKey } = req.body;
+  const expectedKey = process.env.SETUP_KEY || "smmsetup2024";
+  if (!setupKey || setupKey !== expectedKey) {
+    return res.status(403).json({ error: "Invalid setup key" });
+  }
+  if (!email) return res.status(400).json({ error: "Email required" });
+  const [user] = await db.select({ id: usersTable.id, role: usersTable.role }).from(usersTable).where(eq(usersTable.email, email)).limit(1);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  await db.update(usersTable).set({ role: "admin" }).where(eq(usersTable.id, user.id));
+  return res.json({ success: true, message: `${email} is now admin` });
+});
+
 export default router;

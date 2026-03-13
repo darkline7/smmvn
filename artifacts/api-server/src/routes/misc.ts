@@ -20,6 +20,15 @@ router.get("/public/settings", async (_req, res) => {
     rows.forEach(r => { s[r.key] = r.value || ""; });
     return res.json({
       siteName: s["site_name"] || "SMM Pro",
+      siteDescription: s["site_description"] || "",
+      siteKeywords: s["site_keywords"] || "",
+      logoUrl: s["logo_url"] || "",
+      faviconUrl: s["favicon_url"] || "",
+      hotline: s["hotline"] || "",
+      address: s["address"] || "",
+      fanpageUrl: s["fanpage_url"] || "",
+      copyrightLeft: s["copyright_left"] || "",
+      copyrightRight: s["copyright_right"] || "",
       bankName: s["bank_name"] || "",
       bankAccountNumber: s["bank_account_number"] || "",
       bankAccountName: s["bank_account_name"] || "",
@@ -28,6 +37,8 @@ router.get("/public/settings", async (_req, res) => {
       maxDeposit: Number(s["max_deposit"] || "10000"),
       vndExchangeRate: Number(s["vnd_exchange_rate"] || "24000"),
       sepayEnabled: s["sepay_enabled"] === "true",
+      maintenanceMode: s["maintenance_mode"] === "true",
+      registrationOpen: s["registration_open"] !== "false",
     });
   } catch {
     return res.json({

@@ -9,6 +9,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@types/nodemailer": "^7.0.11",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "cookie-parser": "^1.4.7",
@@ -16,6 +17,7 @@
     "drizzle-orm": "catalog:",
     "express": "^5",
     "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^8.0.2",
     "zod": "catalog:"
   },
   "devDependencies": {

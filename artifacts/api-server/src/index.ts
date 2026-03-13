@@ -6,25 +6,58 @@ import { count } from "drizzle-orm";
 
 // Default settings always ensured on startup (upsert logic via onConflictDoNothing)
 const DEFAULT_SETTINGS: { key: string; value: string }[] = [
+  // General
   { key: "site_name", value: "SMM Pro" },
   { key: "site_url", value: "https://smmvn.replit.app" },
+  { key: "site_description", value: "The #1 Premium Social Media Panel" },
+  { key: "site_keywords", value: "smm panel, social media marketing, instagram followers" },
+  { key: "site_author", value: "SMM Pro" },
   { key: "support_email", value: "support@smmvn.replit.app" },
+  { key: "hotline", value: "" },
+  { key: "address", value: "" },
+  { key: "fanpage_url", value: "" },
+  { key: "timezone", value: "Asia/Ho_Chi_Minh" },
+  { key: "copyright_left", value: "© 2025 SMM Pro. All rights reserved." },
+  { key: "copyright_right", value: "Powered by SMM Pro" },
+  // Branding
+  { key: "logo_url", value: "" },
+  { key: "favicon_url", value: "" },
+  // Commerce
   { key: "referral_commission", value: "0.05" },
   { key: "min_order_balance", value: "0.01" },
   { key: "min_deposit", value: "1" },
   { key: "max_deposit", value: "10000" },
   { key: "vnd_exchange_rate", value: "24000" },
+  // Payment - SePay
   { key: "sepay_webhook_secret", value: "" },
   { key: "sepay_enabled", value: "false" },
   { key: "bank_name", value: "" },
   { key: "bank_account_number", value: "" },
   { key: "bank_account_name", value: "" },
   { key: "bank_bin", value: "" },
+  // Telegram
   { key: "telegram_bot_token", value: "" },
   { key: "telegram_admin_chat_id", value: "" },
   { key: "telegram_notify_new_order", value: "true" },
   { key: "telegram_notify_new_deposit", value: "true" },
   { key: "telegram_notify_new_ticket", value: "true" },
+  // SMTP
+  { key: "smtp_host", value: "" },
+  { key: "smtp_port", value: "587" },
+  { key: "smtp_secure", value: "false" },
+  { key: "smtp_user", value: "" },
+  { key: "smtp_pass", value: "" },
+  { key: "smtp_from_name", value: "SMM Pro" },
+  { key: "smtp_from_email", value: "" },
+  { key: "smtp_enabled", value: "false" },
+  // Security
+  { key: "google_client_id", value: "" },
+  { key: "google_client_secret", value: "" },
+  { key: "google_oauth_enabled", value: "false" },
+  { key: "turnstile_site_key", value: "" },
+  { key: "turnstile_secret_key", value: "" },
+  { key: "turnstile_enabled", value: "false" },
+  // System
   { key: "maintenance_mode", value: "false" },
   { key: "registration_open", value: "true" },
   { key: "cron_secret", value: "" },

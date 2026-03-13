@@ -626,4 +626,17 @@ router.post("/test-telegram", async (req: AuthRequest, res: any) => {
   }
 });
 
+// Test SMTP
+router.post("/test-smtp", async (req: AuthRequest, res: any) => {
+  try {
+    const { testEmail } = req.body;
+    if (!testEmail) return res.status(400).json({ ok: false, error: "Cần nhập email nhận test" });
+    const { testSmtp } = await import("../lib/smtp.js");
+    const result = await testSmtp(testEmail);
+    return res.json(result);
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 export default router;

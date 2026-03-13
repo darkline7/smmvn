@@ -1,6 +1,7 @@
 import { useGetAdminStats, useAdminListApiLogs } from "@workspace/api-client-react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { Users, ShoppingCart, DollarSign, CreditCard, TicketIcon, Server, Activity } from "lucide-react";
 import { format } from "date-fns";

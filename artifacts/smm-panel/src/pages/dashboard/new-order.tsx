@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -55,7 +55,7 @@ export default function NewOrder() {
   }, [filteredServices, selectedServiceId]);
 
   // Auto-set first service when category changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (filteredServices.length > 0 && selectedServiceId === undefined) {
       form.setValue("serviceId", filteredServices[0].id);
     }

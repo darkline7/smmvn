@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { useAdminGetSettings } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Settings, Building2, Send, Globe, RefreshCw, CheckCircle2, TestTube } from "lucide-react";
 
-function SettingsSection({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+function SettingsSection({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
     <Card className="border-border/50 shadow-sm">
       <CardHeader className="pb-3">

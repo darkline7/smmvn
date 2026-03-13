@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,7 @@ export default function AdminUsers() {
     });
   };
 
-  const handleAdjustBalance = (e: React.FormEvent, id: number) => {
+  const handleAdjustBalance = (e: FormEvent, id: number) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
     const amount = parseFloat(formData.get("amount") as string);

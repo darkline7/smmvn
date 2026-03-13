@@ -1,0 +1,22 @@
+packages:
+  "framer-motion": "For page transitions, smooth modal appearances, and micro-interactions"
+  "recharts": "For dashboard analytics charts (orders and spend over time)"
+  "date-fns": "For formatting dates in order histories and tables"
+  "react-hook-form": "For robust form state management and validation"
+  "@hookform/resolvers": "For Zod schema validation integration with forms"
+  "clsx": "For conditional class name joining"
+  "tailwind-merge": "For merging tailwind utility classes without conflicts"
+  "@tanstack/react-table": "For complex data tables in admin and user order views"
+
+images:
+  - path: "artifacts/smm-panel/public/images/hero-bg.png"
+    description: "Abstract premium gradient background with soft deep indigo and bright white waves, professional SaaS style, 8k resolution"
+    aspect_ratio: "16:9"
+  - path: "artifacts/smm-panel/public/images/dashboard-pattern.png"
+    description: "Very subtle geometric dot pattern on a pure white background, minimal opacity for clean SaaS dashboard texture"
+    aspect_ratio: "16:9"
+
+notes:
+  - Using generated hooks from @workspace/api-client-react
+  - Authentication relies on the session cookie and /api/auth/me check on initialization
+  - Admin routes are protected by checking user.role === 'admin'

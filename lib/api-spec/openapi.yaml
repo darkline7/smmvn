@@ -1,22 +1,36 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 2.0.0
+  description: SMM Panel API v2 - Complete social media marketing panel
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: services
+    description: SMM services management
+  - name: orders
+    description: Order management
+  - name: wallet
+    description: Wallet and balance operations
+  - name: tickets
+    description: Support tickets
+  - name: admin
+    description: Admin operations
+  - name: providers
+    description: Provider management
+  - name: api-v2
+    description: Public API v2 for third-party integrations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +38,2517 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # AUTH
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [auth]
+      summary: Request password reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+              required: [email]
+      responses:
+        "200":
+          description: Reset email sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # PROFILE
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [auth]
+      summary: Get profile
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+    patch:
+      operationId: updateProfile
+      tags: [auth]
+      summary: Update profile
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /profile/api-key:
+    post:
+      operationId: regenerateApiKey
+      tags: [auth]
+      summary: Regenerate API key
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: New API key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  apiKey:
+                    type: string
+                required: [apiKey]
+
+  # SERVICES
+  /services:
+    get:
+      operationId: listServices
+      tags: [services]
+      summary: List all active services
+      parameters:
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Services list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Service"
+                required: [services]
+
+  /services/{id}:
+    get:
+      operationId: getService
+      tags: [services]
+      summary: Get service detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Service detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [services]
+      summary: List categories
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Category"
+                required: [categories]
+
+  # ORDERS
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: List user orders
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, processing, active, completed, partial, cancelled, failed]
+        - name: serviceId
+          in: query
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Orders list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderListResponse"
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Create new order
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Validation error or insufficient balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /orders/mass:
+    post:
+      operationId: createMassOrders
+      tags: [orders]
+      summary: Create multiple orders at once
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                orders:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/CreateOrderRequest"
+              required: [orders]
+      responses:
+        "200":
+          description: Mass order results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MassOrderResult"
+                required: [results]
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get order detail
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+
+  /orders/{id}/refill:
+    post:
+      operationId: refillOrder
+      tags: [orders]
+      summary: Request order refill
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Refill requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /orders/{id}/cancel:
+    post:
+      operationId: cancelOrder
+      tags: [orders]
+      summary: Cancel order
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # WALLET / BALANCE
+  /wallet/balance:
+    get:
+      operationId: getBalance
+      tags: [wallet]
+      summary: Get current balance
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Balance info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance:
+                    type: number
+                  currency:
+                    type: string
+                required: [balance, currency]
+
+  /wallet/transactions:
+    get:
+      operationId: listTransactions
+      tags: [wallet]
+      summary: List transactions
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [deposit, order, refund, adjustment, commission]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Transaction"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  totalPages:
+                    type: integer
+                required: [transactions, total, page, totalPages]
+
+  /wallet/deposits:
+    get:
+      operationId: listDeposits
+      tags: [wallet]
+      summary: List deposit requests
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Deposits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deposits:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Deposit"
+                required: [deposits]
+    post:
+      operationId: createDeposit
+      tags: [wallet]
+      summary: Create deposit request
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDepositRequest"
+      responses:
+        "201":
+          description: Deposit created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deposit"
+
+  # TICKETS
+  /tickets:
+    get:
+      operationId: listTickets
+      tags: [tickets]
+      summary: List support tickets
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, pending, closed]
+      responses:
+        "200":
+          description: Tickets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tickets:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Ticket"
+                required: [tickets]
+    post:
+      operationId: createTicket
+      tags: [tickets]
+      summary: Create ticket
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTicketRequest"
+      responses:
+        "201":
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"
+
+  /tickets/{id}:
+    get:
+      operationId: getTicket
+      tags: [tickets]
+      summary: Get ticket with messages
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Ticket detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketDetail"
+
+  /tickets/{id}/messages:
+    post:
+      operationId: replyTicket
+      tags: [tickets]
+      summary: Reply to ticket
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+              required: [message]
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketMessage"
+
+  # REFERRALS
+  /referrals:
+    get:
+      operationId: getReferrals
+      tags: [auth]
+      summary: Get referral info and history
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Referral info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferralInfo"
+
+  # NOTIFICATIONS
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [auth]
+      summary: List notifications
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+                  unread:
+                    type: integer
+                required: [notifications, unread]
+
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [auth]
+      summary: Mark all notifications as read
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Done
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  # DASHBOARD STATS
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [orders]
+      summary: Get dashboard statistics
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /dashboard/chart:
+    get:
+      operationId: getDashboardChart
+      tags: [orders]
+      summary: Get dashboard chart data
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [7d, 30d, 90d]
+            default: 30d
+      responses:
+        "200":
+          description: Chart data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChartDataPoint"
+                required: [data]
+
+  # ANNOUNCEMENTS
+  /announcements:
+    get:
+      operationId: listAnnouncements
+      tags: [auth]
+      summary: List active announcements
+      responses:
+        "200":
+          description: Announcements
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  announcements:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Announcement"
+                required: [announcements]
+
+  # ADMIN ENDPOINTS
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Admin dashboard statistics
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Admin stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: List all users
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, banned]
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminUser"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  totalPages:
+                    type: integer
+                required: [users, total, page, totalPages]
+
+  /admin/users/{id}:
+    get:
+      operationId: adminGetUser
+      tags: [admin]
+      summary: Get user detail
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+    patch:
+      operationId: adminUpdateUser
+      tags: [admin]
+      summary: Update user
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUpdateUserRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+
+  /admin/users/{id}/balance:
+    post:
+      operationId: adminAdjustBalance
+      tags: [admin]
+      summary: Adjust user balance
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                note:
+                  type: string
+              required: [amount]
+      responses:
+        "200":
+          description: Balance adjusted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/orders:
+    get:
+      operationId: adminListOrders
+      tags: [admin]
+      summary: Admin list all orders
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - name: serviceId
+          in: query
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderListResponse"
+
+  /admin/orders/{id}:
+    patch:
+      operationId: adminUpdateOrder
+      tags: [admin]
+      summary: Update order status
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending, processing, active, completed, partial, cancelled, failed]
+                startCount:
+                  type: integer
+                remains:
+                  type: integer
+                note:
+                  type: string
+              required: [status]
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /admin/services:
+    get:
+      operationId: adminListServices
+      tags: [admin]
+      summary: Admin list all services
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+        - name: providerId
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive]
+      responses:
+        "200":
+          description: Services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ServiceAdmin"
+                required: [services]
+    post:
+      operationId: adminCreateService
+      tags: [admin]
+      summary: Create service
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceAdmin"
+
+  /admin/services/{id}:
+    patch:
+      operationId: adminUpdateService
+      tags: [admin]
+      summary: Update service
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceAdmin"
+    delete:
+      operationId: adminDeleteService
+      tags: [admin]
+      summary: Delete service
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/categories:
+    get:
+      operationId: adminListCategories
+      tags: [admin]
+      summary: Admin list categories
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Category"
+                required: [categories]
+    post:
+      operationId: adminCreateCategory
+      tags: [admin]
+      summary: Create category
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+
+  /admin/categories/{id}:
+    patch:
+      operationId: adminUpdateCategory
+      tags: [admin]
+      summary: Update category
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+    delete:
+      operationId: adminDeleteCategory
+      tags: [admin]
+      summary: Delete category
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/providers:
+    get:
+      operationId: adminListProviders
+      tags: [admin]
+      summary: List providers
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Providers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Provider"
+                required: [providers]
+    post:
+      operationId: adminCreateProvider
+      tags: [admin]
+      summary: Create provider
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProviderRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Provider"
+
+  /admin/providers/{id}:
+    patch:
+      operationId: adminUpdateProvider
+      tags: [admin]
+      summary: Update provider
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProviderRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Provider"
+    delete:
+      operationId: adminDeleteProvider
+      tags: [admin]
+      summary: Delete provider
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/providers/{id}/test:
+    post:
+      operationId: adminTestProvider
+      tags: [admin]
+      summary: Test provider connection
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Test result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  balance:
+                    type: number
+                required: [success, message]
+
+  /admin/providers/{id}/sync:
+    post:
+      operationId: adminSyncProvider
+      tags: [admin]
+      summary: Sync services from provider
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Sync result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  synced:
+                    type: integer
+                  message:
+                    type: string
+                required: [synced, message]
+
+  /admin/payments:
+    get:
+      operationId: adminListDeposits
+      tags: [admin]
+      summary: Admin list all deposits
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Deposits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deposits:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminDeposit"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  totalPages:
+                    type: integer
+                required: [deposits, total, page, totalPages]
+
+  /admin/payments/{id}/approve:
+    post:
+      operationId: adminApproveDeposit
+      tags: [admin]
+      summary: Approve deposit
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                note:
+                  type: string
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/payments/{id}/reject:
+    post:
+      operationId: adminRejectDeposit
+      tags: [admin]
+      summary: Reject deposit
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/tickets:
+    get:
+      operationId: adminListTickets
+      tags: [admin]
+      summary: Admin list all tickets
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Tickets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tickets:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminTicket"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  totalPages:
+                    type: integer
+                required: [tickets, total, page, totalPages]
+
+  /admin/tickets/{id}:
+    get:
+      operationId: adminGetTicket
+      tags: [admin]
+      summary: Admin get ticket detail
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Ticket detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketDetail"
+
+  /admin/tickets/{id}/status:
+    patch:
+      operationId: adminUpdateTicketStatus
+      tags: [admin]
+      summary: Update ticket status
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [open, pending, closed]
+              required: [status]
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/tickets/{id}/reply:
+    post:
+      operationId: adminReplyTicket
+      tags: [admin]
+      summary: Admin reply to ticket
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+              required: [message]
+      responses:
+        "201":
+          description: Replied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketMessage"
+
+  /admin/announcements:
+    get:
+      operationId: adminListAnnouncements
+      tags: [admin]
+      summary: Admin list announcements
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Announcements
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  announcements:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Announcement"
+                required: [announcements]
+    post:
+      operationId: adminCreateAnnouncement
+      tags: [admin]
+      summary: Create announcement
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAnnouncementRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Announcement"
+
+  /admin/announcements/{id}:
+    patch:
+      operationId: adminUpdateAnnouncement
+      tags: [admin]
+      summary: Update announcement
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAnnouncementRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Announcement"
+    delete:
+      operationId: adminDeleteAnnouncement
+      tags: [admin]
+      summary: Delete announcement
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/api-logs:
+    get:
+      operationId: adminListApiLogs
+      tags: [admin]
+      summary: List API request logs
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: userId
+          in: query
+          schema:
+            type: integer
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [success, error]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: API logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ApiLog"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  totalPages:
+                    type: integer
+                required: [logs, total, page, totalPages]
+
+  /admin/settings:
+    get:
+      operationId: adminGetSettings
+      tags: [admin]
+      summary: Get site settings
+      security:
+        - cookieAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SiteSettings"
+    patch:
+      operationId: adminUpdateSettings
+      tags: [admin]
+      summary: Update site settings
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SiteSettings"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SiteSettings"
+
+  # PUBLIC API v2
+  /v2:
+    post:
+      operationId: apiV2
+      tags: [api-v2]
+      summary: SMM Panel API v2 endpoint
+      description: |
+        Standard SMM Panel API v2. Authenticate with your API key.
+        
+        Supported actions:
+        - `services` - Get list of services
+        - `add` - Create new order
+        - `status` - Get order status
+        - `multiple_status` - Get multiple orders status
+        - `balance` - Get account balance
+        - `refill` - Request refill
+        - `refill_status` - Get refill status
+        - `cancel` - Cancel order
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/ApiV2Request"
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiV2Request"
+      responses:
+        "200":
+          description: API response (varies by action)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiV2Response"
+
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
   schemas:
     HealthStatus:
       type: object
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error]
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required: [success]
+
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        username:
+          type: string
+          minLength: 3
+        referralCode:
+          type: string
+      required: [email, password, username]
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/UserProfile"
+        token:
+          type: string
+      required: [user]
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+          enum: [user, admin, reseller]
+        balance:
+          type: number
+        currency:
+          type: string
+        apiKey:
+          type: string
+        referralCode:
+          type: string
+        timezone:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        banned:
+          type: boolean
+      required: [id, email, username, role, balance, currency]
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+        timezone:
+          type: string
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        sortOrder:
+          type: integer
+        active:
+          type: boolean
+        serviceCount:
+          type: integer
+      required: [id, name, active]
+
+    CreateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        sortOrder:
+          type: integer
+        active:
+          type: boolean
+      required: [name]
+
+    Service:
+      type: object
+      properties:
+        id:
+          type: integer
+        categoryId:
+          type: integer
+        categoryName:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+          enum: [default, custom_comments, packages, subscriptions]
+        rate:
+          type: number
+          description: Price per 1000
+        min:
+          type: integer
+        max:
+          type: integer
+        description:
+          type: string
+        averageTime:
+          type: string
+        refill:
+          type: boolean
+        cancel:
+          type: boolean
+        dripfeed:
+          type: boolean
+        subscriptions:
+          type: boolean
+        status:
+          type: string
+          enum: [active, inactive]
+      required: [id, categoryId, name, type, rate, min, max]
+
+    ServiceAdmin:
+      allOf:
+        - $ref: "#/components/schemas/Service"
+        - type: object
+          properties:
+            providerId:
+              type: integer
+            providerName:
+              type: string
+            providerServiceId:
+              type: string
+            sortOrder:
+              type: integer
+            tags:
+              type: array
+              items:
+                type: string
+            createdAt:
+              type: string
+              format: date-time
+
+    CreateServiceRequest:
+      type: object
+      properties:
+        categoryId:
+          type: integer
+        name:
+          type: string
+        providerId:
+          type: integer
+        providerServiceId:
+          type: string
+        type:
+          type: string
+          enum: [default, custom_comments, packages, subscriptions]
+        rate:
+          type: number
+        min:
+          type: integer
+        max:
+          type: integer
+        description:
+          type: string
+        averageTime:
+          type: string
+        refill:
+          type: boolean
+        cancel:
+          type: boolean
+        dripfeed:
+          type: boolean
+        subscriptions:
+          type: boolean
+        sortOrder:
+          type: integer
+        status:
+          type: string
+          enum: [active, inactive]
+        tags:
+          type: array
+          items:
+            type: string
+      required: [categoryId, name, type, rate, min, max]
+
+    Provider:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        baseUrl:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+        notes:
+          type: string
+        serviceCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, name, baseUrl, status]
+
+    CreateProviderRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        baseUrl:
+          type: string
+        apiKey:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive]
+        notes:
+          type: string
+      required: [name, baseUrl, apiKey]
+
+    CreateOrderRequest:
+      type: object
+      properties:
+        serviceId:
+          type: integer
+        link:
+          type: string
+        quantity:
+          type: integer
+        runs:
+          type: integer
+          description: For drip-feed orders
+        interval:
+          type: integer
+          description: Interval in minutes for drip-feed
+        comments:
+          type: string
+          description: Custom comments separated by newlines
+        username:
+          type: string
+        hashtags:
+          type: string
+      required: [serviceId, link, quantity]
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        serviceId:
+          type: integer
+        serviceName:
+          type: string
+        link:
+          type: string
+        quantity:
+          type: integer
+        startCount:
+          type: integer
+        remains:
+          type: integer
+        charge:
+          type: number
+        status:
+          type: string
+          enum: [pending, processing, active, completed, partial, cancelled, failed]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, serviceId, serviceName, link, quantity, charge, status, createdAt]
+
+    OrderDetail:
+      allOf:
+        - $ref: "#/components/schemas/Order"
+        - type: object
+          properties:
+            service:
+              $ref: "#/components/schemas/Service"
+            logs:
+              type: array
+              items:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  note:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+                required: [status, createdAt]
+
+    MassOrderResult:
+      type: object
+      properties:
+        index:
+          type: integer
+        success:
+          type: boolean
+        orderId:
+          type: integer
+        error:
+          type: string
+      required: [index, success]
+
+    OrderListResponse:
+      type: object
+      properties:
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        total:
+          type: integer
+        page:
+          type: integer
+        totalPages:
+          type: integer
+      required: [orders, total, page, totalPages]
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [deposit, order, refund, adjustment, commission]
+        amount:
+          type: number
+        balanceAfter:
+          type: number
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, amount, balanceAfter, createdAt]
+
+    Deposit:
+      type: object
+      properties:
+        id:
+          type: integer
+        amount:
+          type: number
+        method:
+          type: string
+          enum: [bank_transfer, qr_payment, crypto]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        proofUrl:
+          type: string
+        note:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, amount, method, status, createdAt]
+
+    CreateDepositRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+        method:
+          type: string
+          enum: [bank_transfer, qr_payment, crypto]
+        note:
+          type: string
+      required: [amount, method]
+
+    Ticket:
+      type: object
+      properties:
+        id:
+          type: integer
+        subject:
+          type: string
+        status:
+          type: string
+          enum: [open, pending, closed]
+        priority:
+          type: string
+          enum: [low, medium, high]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastMessage:
+          type: string
+      required: [id, subject, status, priority, createdAt]
+
+    TicketMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        ticketId:
+          type: integer
+        message:
+          type: string
+        isAdmin:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, ticketId, message, isAdmin, createdAt]
+
+    TicketDetail:
+      allOf:
+        - $ref: "#/components/schemas/Ticket"
+        - type: object
+          properties:
+            messages:
+              type: array
+              items:
+                $ref: "#/components/schemas/TicketMessage"
+          required: [messages]
+
+    CreateTicketRequest:
+      type: object
+      properties:
+        subject:
+          type: string
+        message:
+          type: string
+        priority:
+          type: string
+          enum: [low, medium, high]
+          default: medium
+      required: [subject, message]
+
+    ReferralInfo:
+      type: object
+      properties:
+        referralCode:
+          type: string
+        referralLink:
+          type: string
+        totalReferrals:
+          type: integer
+        totalCommission:
+          type: number
+        commissionRate:
+          type: number
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              userId:
+                type: integer
+              username:
+                type: string
+              commission:
+                type: number
+              createdAt:
+                type: string
+                format: date-time
+            required: [userId, username, commission, createdAt]
+      required: [referralCode, referralLink, totalReferrals, totalCommission, commissionRate, history]
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [system, order, ticket, deposit]
+        title:
+          type: string
+        message:
+          type: string
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, title, message, read, createdAt]
+
+    DashboardStats:
+      type: object
+      properties:
+        balance:
+          type: number
+        totalOrders:
+          type: integer
+        pendingOrders:
+          type: integer
+        completedOrders:
+          type: integer
+        monthlySpend:
+          type: number
+        currency:
+          type: string
+      required: [balance, totalOrders, pendingOrders, completedOrders, monthlySpend, currency]
+
+    ChartDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        orders:
+          type: integer
+        spend:
+          type: number
+      required: [date, orders, spend]
+
+    Announcement:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        type:
+          type: string
+          enum: [info, warning, maintenance, success]
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, title, content, type, active, createdAt]
+
+    CreateAnnouncementRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        type:
+          type: string
+          enum: [info, warning, maintenance, success]
+        active:
+          type: boolean
+      required: [title, content, type]
+
+    AdminStats:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        totalOrders:
+          type: integer
+        totalRevenue:
+          type: number
+        pendingDeposits:
+          type: integer
+        openTickets:
+          type: integer
+        activeServices:
+          type: integer
+        todayOrders:
+          type: integer
+        todayRevenue:
+          type: number
+      required: [totalUsers, totalOrders, totalRevenue, pendingDeposits, openTickets, activeServices, todayOrders, todayRevenue]
+
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+        balance:
+          type: number
+        totalOrders:
+          type: integer
+        totalSpend:
+          type: number
+        banned:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, email, username, role, balance, totalOrders, totalSpend, banned, createdAt]
+
+    AdminUserDetail:
+      allOf:
+        - $ref: "#/components/schemas/AdminUser"
+        - type: object
+          properties:
+            apiKey:
+              type: string
+            referralCode:
+              type: string
+            recentOrders:
+              type: array
+              items:
+                $ref: "#/components/schemas/Order"
+            recentTransactions:
+              type: array
+              items:
+                $ref: "#/components/schemas/Transaction"
+
+    AdminUpdateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        role:
+          type: string
+          enum: [user, admin, reseller]
+        banned:
+          type: boolean
+        balance:
+          type: number
+
+    AdminDeposit:
+      allOf:
+        - $ref: "#/components/schemas/Deposit"
+        - type: object
+          properties:
+            userId:
+              type: integer
+            username:
+              type: string
+            email:
+              type: string
+
+    AdminTicket:
+      allOf:
+        - $ref: "#/components/schemas/Ticket"
+        - type: object
+          properties:
+            userId:
+              type: integer
+            username:
+              type: string
+            messageCount:
+              type: integer
+
+    ApiLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        username:
+          type: string
+        action:
+          type: string
+        requestBody:
+          type: object
+          additionalProperties: true
+        responseBody:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum: [success, error]
+        ipAddress:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, action, status, createdAt]
+
+    SiteSettings:
+      type: object
+      properties:
+        siteName:
+          type: string
+        siteUrl:
+          type: string
+        currency:
+          type: string
+        currencySymbol:
+          type: string
+        timezone:
+          type: string
+        maintenanceMode:
+          type: boolean
+        registrationEnabled:
+          type: boolean
+        minDeposit:
+          type: number
+        referralCommissionRate:
+          type: number
+        supportEmail:
+          type: string
+
+    ApiV2Request:
+      type: object
+      properties:
+        key:
+          type: string
+          description: API key
+        action:
+          type: string
+          enum: [services, add, status, multiple_status, balance, refill, refill_status, cancel]
+        service:
+          type: integer
+          description: Service ID (for add)
+        link:
+          type: string
+          description: Link (for add)
+        quantity:
+          type: integer
+          description: Quantity (for add)
+        order:
+          type: integer
+          description: Order ID (for status/refill/cancel)
+        orders:
+          type: string
+          description: Comma-separated order IDs (for multiple_status)
+        runs:
+          type: integer
+        interval:
+          type: integer
+        comments:
+          type: string
+        username:
+          type: string
+      required: [key, action]
+
+    ApiV2Response:
+      type: object
+      additionalProperties: true
+      description: Response varies by action type

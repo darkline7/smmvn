@@ -1,8 +1,8 @@
-# Workspace
+# SMM Panel Pro
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+Full-stack Social Media Marketing panel with user dashboard, admin panel, API v2, and complete order management system.
 
 ## Stack
 
@@ -14,83 +14,124 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Database**: PostgreSQL + Drizzle ORM
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+- **Frontend**: React 18 + Vite + Tailwind CSS + shadcn/ui
+- **Data fetching**: TanStack React Query (generated hooks)
+- **Charts**: Recharts
+- **Forms**: react-hook-form + @hookform/resolvers
+- **Animations**: framer-motion
+- **Build**: esbuild (API server CJS bundle)
+
+## Architecture
+
+### Session Management
+The API server uses an in-memory session store (Map) with cookie-based sessions (`sid` cookie). Session functions `setSession()` and `getSession()` are exported from `artifacts/api-server/src/app.ts`.
+
+### Authentication
+- Session cookie auth for web users
+- API key auth for public API v2 (`/api/v2` endpoint)
+- Admin: uses session + role check (`requireAdmin` middleware)
+
+### Demo Credentials
+- Admin: `admin@smmpanel.com` / `password` → role: admin
+- Demo User: `demo@smmpanel.com` / `password` → role: user, balance: $50
 
 ## Structure
 
 ```text
 artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+├── artifacts/
+│   ├── api-server/         # Express API server
+│   │   └── src/
+│   │       ├── app.ts       # Express app + session middleware
+│   │       ├── lib/auth.ts  # Auth helpers (requireAuth, requireAdmin, etc.)
+│   │       └── routes/
+│   │           ├── auth.ts       # /api/auth/*
+│   │           ├── profile.ts    # /api/profile
+│   │           ├── services.ts   # /api/services, /api/categories
+│   │           ├── orders.ts     # /api/orders
+│   │           ├── wallet.ts     # /api/wallet/*
+│   │           ├── tickets.ts    # /api/tickets
+│   │           ├── dashboard.ts  # /api/dashboard/*
+│   │           ├── misc.ts       # /api/announcements, /api/notifications, /api/referrals
+│   │           ├── admin.ts      # /api/admin/* (all admin routes)
+│   │           └── apiv2.ts      # /api/v2 (public API v2)
+│   └── smm-panel/          # React + Vite frontend
+│       └── src/
+│           ├── pages/       # All page components
+│           │   ├── public/  # Landing, services, api-docs pages
+│           │   ├── auth/    # Login, register pages
+│           │   ├── dashboard/ # User dashboard pages
+│           │   └── admin/   # Admin panel pages
+│           ├── components/  # Shared UI components
+│           └── App.tsx      # Root app with routing
+├── lib/
+│   ├── api-spec/            # OpenAPI 3.1 spec + Orval codegen config
+│   ├── api-client-react/    # Generated React Query hooks
+│   ├── api-zod/             # Generated Zod schemas
+│   └── db/
+│       └── src/schema/
+│           ├── users.ts
+│           ├── categories.ts
+│           ├── services.ts
+│           ├── providers.ts
+│           ├── orders.ts
+│           ├── transactions.ts
+│           ├── tickets.ts
+│           └── misc.ts      # announcements, notifications, referrals, settings, api logs
 ```
 
-## TypeScript & Composite Projects
+## Pages
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
+### Public
+- `/` - Landing page
+- `/services` - Service catalog
+- `/api-docs` - API v2 documentation
+- `/pricing` - Pricing page
+- `/faq` - FAQ
+- `/login`, `/register`, `/forgot-password`
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+### User Dashboard (requires auth)
+- `/dashboard` - Stats + chart + recent orders
+- `/new-order` - Order form with service picker + real-time price calc
+- `/orders` - Order list with filters, refill/cancel
+- `/mass-order` - Bulk order textarea
+- `/subscriptions` - Manage subscriptions
+- `/drip-feed` - Drip-feed orders
+- `/services` - Browse services
+- `/add-funds` - Deposit page (bank transfer, QR)
+- `/transactions` - Transaction history
+- `/tickets` - Support tickets
+- `/api` - API key management + code examples
+- `/profile` - Profile settings
+- `/referrals` - Referral program
+- `/notifications` - Notifications
 
-## Root Scripts
+### Admin Panel (requires admin role)
+- `/admin` - Admin dashboard
+- `/admin/users` - User management
+- `/admin/orders` - Order management
+- `/admin/services` - Service CRUD
+- `/admin/categories` - Category CRUD
+- `/admin/providers` - Provider management (test/sync)
+- `/admin/payments` - Deposit approvals
+- `/admin/tickets` - Ticket management
+- `/admin/announcements` - Announcements
+- `/admin/api-logs` - API request logs
+- `/admin/settings` - Site settings
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
+## API v2
 
-## Packages
+Public endpoint: `POST /api/v2`
 
-### `artifacts/api-server` (`@workspace/api-server`)
+Actions: `services`, `add`, `status`, `multiple_status`, `balance`, `refill`, `refill_status`, `cancel`
 
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
+Auth: `key` parameter (API key from user profile)
 
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+## Database Operations
 
-### `lib/db` (`@workspace/db`)
+- Push schema: `pnpm --filter @workspace/db run push`
+- Force push: `pnpm --filter @workspace/db run push-force`
 
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
+## Codegen
 
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
-
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
-
-### `lib/api-spec` (`@workspace/api-spec`)
-
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
-
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
-
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
-
-### `lib/api-zod` (`@workspace/api-zod`)
-
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
-
-### `lib/api-client-react` (`@workspace/api-client-react`)
-
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
-
-### `scripts` (`@workspace/scripts`)
-
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+Run after OpenAPI spec changes: `pnpm --filter @workspace/api-spec run codegen`

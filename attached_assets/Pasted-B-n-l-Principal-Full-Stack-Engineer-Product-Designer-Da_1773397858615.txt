@@ -1,0 +1,618 @@
+Bạn là Principal Full-Stack Engineer + Product Designer + Database Architect + Security Engineer.
+
+Nhiệm vụ: tạo từ đầu một hệ thống web “SMM Panel API v2” production-ready để kinh doanh, giao diện hiện đại, chuyên nghiệp, sáng, sạch, dễ dùng, bám phong cách ảnh tham chiếu:
+- nền sáng
+- card trắng bo tròn lớn
+- sidebar trái desktop
+- nội dung ở giữa
+- widget/statistics đẹp
+- mobile có bottom navigation
+- UI giống social/dashboard hiện đại, không quá cứng
+
+TUYỆT ĐỐI KHÔNG HỎI LẠI TÔI. Nếu thiếu chi tiết, tự chọn best-practice và ghi rõ giả định trong README.
+
+==================================================
+1. MỤC TIÊU SẢN PHẨM
+==================================================
+Tạo một web SMM Panel API v2 hoàn chỉnh để kinh doanh, gồm:
+- landing page
+- user dashboard
+- admin dashboard
+- API v2 đầy đủ
+- order services
+- balance/wallet
+- nạp tiền
+- ticket support
+- quản lý dịch vụ
+- quản lý nhà cung cấp/provider
+- logs
+- webhook
+- affiliate/referral
+- tài liệu API
+- multi-role system
+- analytics
+- responsive desktop/mobile
+
+Hệ thống phục vụ các use case marketing hợp pháp, tích hợp API theo mô hình provider/reseller. Không thêm tính năng spam/quấy rối trái phép.
+
+==================================================
+2. STACK BẮT BUỘC
+==================================================
+Frontend:
+- React 18 + TypeScript + Vite
+
+UI:
+- Tailwind CSS
+- shadcn/ui
+- lucide-react
+- sonner
+- framer-motion
+- recharts
+
+State/Data:
+- TanStack React Query
+- Zustand hoặc Context nếu cần
+
+Routing:
+- React Router DOM v6+
+
+Backend:
+- Supabase (Database + Auth + Storage + Edge Functions nếu cần)
+- hoặc Node/Express serverless layer nếu cần cho secure provider proxy
+=> chọn kiến trúc tốt nhất, nhưng phải giải thích rõ
+
+Forms:
+- react-hook-form
+- zod
+
+Theme:
+- light mode chính
+- dark mode optional
+
+==================================================
+3. GIAO DIỆN / PHONG CÁCH
+==================================================
+UI phải rất đẹp và giống tinh thần ảnh tham chiếu:
+- layout rộng, sạch
+- card trắng rounded-2xl hoặc 3xl
+- border nhẹ
+- shadow mềm
+- text rõ ràng
+- primary xanh tím dịu
+- bảng/table hiện đại
+- dashboard chuyên nghiệp
+- sidebar trái desktop
+- mobile có bottom nav hoặc bottom tabs
+- form/order page mượt
+- admin panel không khô cứng
+- landing page nhìn premium, tin cậy, dễ bán hàng
+
+Trang desktop gồm:
+- sidebar trái
+- content center
+- widget/stat cards phía trên
+- tables/cards phía dưới
+
+Mobile:
+- layout full-width
+- cards gọn
+- order flow dễ dùng
+- navigation bottom
+
+==================================================
+4. CÁC TRANG BẮT BUỘC
+==================================================
+PUBLIC:
+- /
+- /services
+- /api-docs
+- /pricing
+- /faq
+- /login
+- /register
+- /forgot-password
+
+USER:
+- /dashboard
+- /new-order
+- /orders
+- /mass-order
+- /subscriptions
+- /drip-feed
+- /services
+- /add-funds
+- /transactions
+- /tickets
+- /api
+- /profile
+- /referrals
+- /notifications
+
+ADMIN:
+- /admin
+- /admin/users
+- /admin/orders
+- /admin/services
+- /admin/categories
+- /admin/providers
+- /admin/payments
+- /admin/tickets
+- /admin/announcements
+- /admin/logs
+- /admin/settings
+- /admin/api-logs
+- /admin/referrals
+
+==================================================
+5. CHỨC NĂNG USER BẮT BUỘC
+==================================================
+
+A. AUTH
+- đăng ký
+- đăng nhập
+- quên mật khẩu
+- verify email optional
+- profile settings
+- API key của user
+
+B. DASHBOARD
+- số dư hiện tại
+- tổng đơn
+- đơn đang xử lý
+- đơn hoàn thành
+- chi tiêu tháng này
+- biểu đồ sử dụng
+- thông báo hệ thống
+- dịch vụ phổ biến
+
+C. NEW ORDER
+Form đặt đơn chuẩn SMM panel:
+- chọn category
+- chọn service
+- link
+- quantity
+- custom comments nếu service hỗ trợ
+- username nếu service hỗ trợ
+- hashtags nếu service hỗ trợ
+- intervals nếu drip-feed
+- runs nếu drip-feed
+- posts count nếu subscription
+- delay nếu subscription/drip
+- tự tính giá realtime
+- validate min/max
+- hiển thị average time / description / refill / cancel policy
+
+D. MASS ORDER
+- textarea nhập nhiều dòng
+- parse theo định dạng:
+  service_id|link|quantity
+- preview trước khi submit
+- submit hàng loạt
+- báo lỗi từng dòng
+
+E. ORDERS
+- danh sách đơn
+- filter theo status/date/service
+- search order id/link
+- xem chi tiết
+- refill nếu service hỗ trợ
+- cancel nếu service hỗ trợ
+- xem logs/order history
+- export CSV
+
+F. SUBSCRIPTIONS
+- tạo đơn subscription
+- quản lý subscription active
+- pause/resume/cancel
+
+G. DRIP FEED
+- tạo drip-feed order
+- runs + interval
+- hiển thị schedule
+- lịch sử batch
+
+H. WALLET / ADD FUNDS
+- số dư
+- lịch sử nạp/rút/chi tiêu
+- tạo yêu cầu nạp tiền
+- nhiều phương thức:
+  - manual bank transfer
+  - QR payment
+  - crypto optional
+- upload biên lai optional
+- trạng thái pending/approved/rejected
+
+I. TRANSACTIONS
+- tất cả giao dịch
+- type: deposit/order/refund/adjustment/commission
+- filter + export
+
+J. TICKETS / SUPPORT
+- tạo ticket
+- trả lời ticket
+- trạng thái open/closed/pending
+- attachment optional
+
+K. API PAGE
+- hiển thị API key
+- regenerate API key
+- docs sử dụng API
+- ví dụ code:
+  - PHP
+  - Python
+  - Node.js
+  - cURL
+
+L. PROFILE
+- tên
+- email
+- password
+- timezone
+- language
+- avatar optional
+- security settings
+
+M. REFERRALS
+- referral code
+- referral link
+- số người giới thiệu
+- commission
+- lịch sử commission
+
+N. NOTIFICATIONS
+- system notices
+- order updates
+- ticket replies
+- deposit status
+
+==================================================
+6. API V2 BẮT BUỘC
+==================================================
+Tạo API v2 đầy đủ kiểu SMM panel chuẩn:
+
+Endpoint duy nhất hoặc RESTful, nhưng phải hỗ trợ logic tương đương:
+- action=services
+- action=add
+- action=status
+- action=multiple_status
+- action=balance
+- action=refill
+- action=refill_status
+- action=cancel
+
+Hoặc REST tương đương:
+- POST /api/v2/order
+- GET /api/v2/services
+- GET /api/v2/order/:id
+- POST /api/v2/order/status/bulk
+- GET /api/v2/balance
+- POST /api/v2/refill
+- GET /api/v2/refill/:id
+- POST /api/v2/cancel
+
+Phải có:
+- API auth bằng API key
+- rate limit
+- request logs
+- response chuẩn JSON
+- error codes rõ ràng
+- docs chi tiết
+- ví dụ request/response
+- support bulk status
+- logs cho admin
+
+==================================================
+7. PROVIDER SYSTEM
+==================================================
+Hệ thống provider cực quan trọng:
+- quản lý nhà cung cấp API upstream
+- mỗi provider có:
+  - name
+  - base_url
+  - api_key
+  - status
+  - notes
+- sync services từ provider
+- map service nội bộ với provider service
+- mark-up giá
+- enable/disable service
+- auto update provider price optional
+- test provider connection
+- retry/fallback provider optional
+- service import/sync hàng loạt
+- provider logs
+
+==================================================
+8. DỊCH VỤ / CATEGORY
+==================================================
+Quản lý category + services:
+
+CATEGORY:
+- id
+- name
+- description
+- sort_order
+- active
+
+SERVICE:
+- category_id
+- name
+- provider_id
+- provider_service_id
+- type
+- rate
+- min
+- max
+- description
+- average_time
+- refill
+- cancel
+- dripfeed
+- subscriptions
+- custom_comments
+- custom_link_format
+- status
+- sort_order
+- tags
+- icon optional
+
+User chỉ thấy service active.
+Admin có thể:
+- create/update/delete
+- sort
+- clone service
+- bulk update rates
+- import/export CSV
+
+==================================================
+9. ADMIN PANEL BẮT BUỘC
+==================================================
+ADMIN DASHBOARD:
+- total users
+- total orders
+- total revenue
+- pending deposits
+- open tickets
+- active services
+- provider status
+- charts theo ngày/tháng
+
+ADMIN USERS:
+- list/search/filter users
+- view profile
+- edit balance
+- ban/unban
+- reset password
+- impersonate optional
+- view API usage
+- referral stats
+
+ADMIN ORDERS:
+- list/search/filter
+- view detail
+- change status manually
+- partial/complete/fail/refund
+- cancel order
+- refill handling
+- logs
+
+ADMIN PAYMENTS:
+- deposit requests
+- approve/reject
+- transaction proof
+- manual adjustment
+
+ADMIN TICKETS:
+- reply
+- change status
+- assign ticket
+- canned responses optional
+
+ADMIN ANNOUNCEMENTS:
+- site-wide banner
+- maintenance notice
+- popup optional
+
+ADMIN SETTINGS:
+- site name
+- logo
+- favicon
+- currency
+- timezone
+- SEO settings
+- theme settings
+- payment settings
+- API settings
+- registration settings
+- maintenance mode
+
+ADMIN API LOGS:
+- logs request API v2
+- filter theo user/action/date
+- status success/error
+- export
+
+==================================================
+10. DATABASE SCHEMA
+==================================================
+Thiết kế DB đầy đủ, tối thiểu phải có:
+- profiles
+- api_keys
+- categories
+- services
+- providers
+- provider_service_maps
+- orders
+- order_logs
+- order_refills
+- subscriptions
+- drip_feed_batches
+- tickets
+- ticket_messages
+- transactions
+- deposits
+- announcements
+- notifications
+- referrals
+- referral_commissions
+- site_settings
+- api_request_logs
+- admin_roles
+- audit_logs
+
+Mỗi bảng có:
+- id uuid hoặc bigint hợp lý
+- created_at
+- updated_at
+- soft delete nếu hợp lý
+
+==================================================
+11. RLS / PERMISSIONS / SECURITY
+==================================================
+Phải viết đầy đủ bảo mật:
+- RLS policies cho tất cả bảng
+- user chỉ xem dữ liệu của mình
+- admin role có quyền rộng
+- API key không lộ
+- provider API key không lộ ra client
+- không để secret trên frontend
+- dùng server/edge function hoặc backend proxy cho các thao tác provider nhạy cảm
+- validate toàn bộ input bằng zod
+- rate limit API
+- audit logs cho thao tác admin quan trọng
+- transaction integrity khi tạo order/trừ balance
+- chống race condition khi order
+- idempotency basic cho API nếu cần
+- logs lỗi rõ ràng
+- webhook verification nếu có
+
+==================================================
+12. THANH TOÁN / NẠP TIỀN
+==================================================
+Làm module add funds hoàn chỉnh:
+- Bank transfer manual
+- QR code payment card đẹp
+- trạng thái pending/approved/rejected
+- user xem lịch sử
+- admin duyệt
+- auto note matching optional
+- structure sẵn để tích hợp SePay / banking webhook nếu cần
+- tuyệt đối không hardcode secret
+
+==================================================
+13. LANDING PAGE
+==================================================
+Trang landing phải đẹp, chuyên nghiệp, có khả năng bán hàng:
+- hero section
+- stats
+- top features
+- categories/services preview
+- API section
+- pricing/benefits
+- FAQ
+- testimonials mock
+- CTA register/login
+- responsive tốt
+
+==================================================
+14. UX / UI CHI TIẾT
+==================================================
+- table đẹp
+- filter bar đẹp
+- search bar
+- skeleton loading
+- empty states
+- error states
+- toast đẹp
+- form step hợp lý
+- order calculator realtime
+- mobile order form dễ nhập
+- admin sidebar tối giản, đẹp
+- dashboard cards đẹp như ảnh tham chiếu
+- màu primary xanh tím dịu
+- card bo tròn lớn
+- bóng mờ nhẹ
+- spacing thoáng
+
+==================================================
+15. SEED DATA
+==================================================
+Seed đầy đủ:
+- 1 admin
+- 10 users
+- 8 categories
+- 40 services
+- 3 providers
+- 25 orders
+- 5 deposits
+- 8 tickets
+- 5 announcements
+- referral data mẫu
+
+==================================================
+16. FILE OUTPUT BẮT BUỘC
+==================================================
+Phải xuất đầy đủ:
+1. cây thư mục hoàn chỉnh
+2. toàn bộ code từng file
+3. schema SQL / Supabase migrations
+4. RLS policies
+5. seed data
+6. .env.example
+7. README cực chi tiết:
+   - setup local
+   - tạo Supabase project
+   - chạy migrations
+   - tạo admin
+   - set buckets
+   - set env
+   - chạy dev
+   - build
+   - deploy
+   - cách dùng API v2
+   - cách thêm provider
+   - cách sync services
+
+==================================================
+17. DESIGN SYSTEM
+==================================================
+Dùng design system giống ảnh tham chiếu:
+- background: #f6f7fb hoặc tương đương
+- card trắng
+- border rất nhẹ
+- primary: xanh tím dịu
+- radius lớn
+- shadow mềm
+- text rõ
+- mobile-first
+- desktop có sidebar + content area + stat cards
+
+==================================================
+18. BONUS (TỰ LÀM LUÔN NẾU ĐƯỢC)
+==================================================
+- affiliate dashboard
+- coupon system
+- user rank / reseller tier
+- markup theo user tier
+- webhook cho order updates
+- provider fallback
+- service favorites
+- recent used services
+- pinned announcements
+- export/import CSV
+- maintenance page
+- multilingual structure
+- theme switcher
+- admin analytics charts
+- support canned ticket replies
+- API usage graph per user
+
+==================================================
+19. QUY TẮC QUAN TRỌNG
+==================================================
+- Không hỏi lại tôi
+- Không chỉ mô tả lý thuyết
+- Phải xuất code thật
+- Phải đầy đủ frontend + backend logic + database + auth + admin + API docs
+- Nếu output dài, chia phần nhưng không bỏ sót file nào
+- Tự hoàn thiện các phần thiếu theo best-practice

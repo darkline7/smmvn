@@ -41,6 +41,10 @@ export default function AddFunds() {
   const [pendingDeposit, setPendingDeposit] = useState<any>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
+  // Auto-load most recent pending deposit so QR/bank info persists after page refresh
+  const lastPending = depositsData?.deposits?.find((d: any) => d.status === "pending");
+  const activeDeposit = pendingDeposit || lastPending || null;
+
   const form = useForm<z.infer<typeof depositSchema>>({
     resolver: zodResolver(depositSchema),
     defaultValues: { amount: 50 },
@@ -49,8 +53,8 @@ export default function AddFunds() {
   const amount = form.watch("amount");
   const vndAmount = Math.round(amount * 24000);
   const vndFormatted = vndAmount.toLocaleString("vi-VN");
-  const refCode = pendingDeposit ? `SMM${pendingDeposit.id}` : "SMM{ID}";
-  const qrUrl = pendingDeposit
+  const refCode = activeDeposit ? `SMM${activeDeposit.id}` : "SMM{ID}";
+  const qrUrl = activeDeposit
     ? `https://qr.sepay.vn/img?acc=${BANK_INFO.accountNumber}&bank=${BANK_INFO.bin}&amount=${vndAmount}&des=${refCode}&template=compact&download=false`
     : null;
 
@@ -159,14 +163,14 @@ export default function AddFunds() {
                 </CardContent>
               </Card>
 
-              {pendingDeposit ? (
+              {activeDeposit ? (
                 <Card className="border-primary/30 shadow-sm bg-primary/5">
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <QrCode className="w-5 h-5 text-primary" />
                       Bước 2: Chuyển khoản
                     </CardTitle>
-                    <CardDescription>Mã giao dịch: <span className="font-bold text-foreground">SMM{pendingDeposit.id}</span></CardDescription>
+                    <CardDescription>Mã giao dịch: <span className="font-bold text-foreground">SMM{activeDeposit.id}</span></CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {qrUrl && (
@@ -182,7 +186,7 @@ export default function AddFunds() {
                         { label: "Số tài khoản", value: BANK_INFO.accountNumber, id: "acc" },
                         { label: "Chủ tài khoản", value: BANK_INFO.accountName, id: "name" },
                         { label: "Số tiền", value: `${vndFormatted} VND`, id: "amount" },
-                        { label: "Nội dung CK", value: `SMM${pendingDeposit.id}`, id: "ref" },
+                        { label: "Nội dung CK", value: `SMM${activeDeposit.id}`, id: "ref" },
                       ].map(({ label, value, id }) => (
                         <div key={id} className="flex items-center justify-between p-2.5 rounded-lg bg-background border">
                           <span className="text-muted-foreground">{label}</span>
@@ -195,7 +199,7 @@ export default function AddFunds() {
                     </div>
                     <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800">
                       <p className="text-xs text-yellow-700 dark:text-yellow-300 font-medium">
-                        ⚠️ Nhập đúng nội dung chuyển khoản <strong>SMM{pendingDeposit.id}</strong> để hệ thống tự động xử lý.
+                        ⚠️ Nhập đúng nội dung chuyển khoản <strong>SMM{activeDeposit.id}</strong> để hệ thống tự động xử lý.
                       </p>
                     </div>
                   </CardContent>

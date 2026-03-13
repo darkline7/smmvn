@@ -1,4 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,9 +7,70 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useAdminGetSettings } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Settings, Building2, Send, Globe, RefreshCw, CheckCircle2, TestTube } from "lucide-react";
+import { Save, Settings, Building2, Send, Globe, RefreshCw, CheckCircle2, TestTube, Database, Copy, Wifi, WifiOff, Loader2 } from "lucide-react";
+
+function DbStatusCard() {
+  const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["db-status"],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/admin/db-status`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    refetchInterval: 30_000,
+  });
+
+  return (
+    <Card className="border-border/50 shadow-sm">
+      <CardHeader className="pb-3 flex-row items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Database className="w-4 h-4 text-muted-foreground" />
+          <CardTitle className="text-base">Kết nối Database</CardTitle>
+        </div>
+        <Button variant="ghost" size="icon" onClick={() => refetch()} disabled={isLoading}>
+          <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Loader2 className="w-4 h-4 animate-spin" /> Đang kiểm tra...
+          </div>
+        ) : data?.connected ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-sm font-medium text-green-600">PostgreSQL đang kết nối</span>
+              <Badge variant="outline" className="text-green-600 border-green-200 text-xs">{data.latencyMs}ms</Badge>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-lg bg-muted text-center">
+                <p className="text-2xl font-bold">{data.userCount}</p>
+                <p className="text-xs text-muted-foreground">Tổng users</p>
+              </div>
+              <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-center">
+                <Wifi className="w-6 h-6 mx-auto mb-1 text-green-600" />
+                <p className="text-xs text-green-600 font-medium">Online</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200">
+            <WifiOff className="w-5 h-5 text-red-500" />
+            <div>
+              <p className="text-sm font-medium text-red-600">Mất kết nối database</p>
+              <p className="text-xs text-red-500">{data?.error || "Không thể kết nối PostgreSQL"}</p>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function SettingsSection({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
@@ -169,10 +231,12 @@ export default function AdminSettings() {
           </TabsContent>
 
           <TabsContent value="system" className="space-y-4 mt-4">
+            <DbStatusCard />
+
             <SettingsSection title="Cài đặt đơn hàng" description="Quy tắc xử lý đơn hàng">
               <Field label="Số dư tối thiểu để đặt hàng ($)" id="min_order_balance" value={form.min_order_balance || "0.01"} onChange={set("min_order_balance")} type="number" />
-              <Field label="Số dư tối thiểu nạp tiền ($)" id="min_deposit" value={form.min_deposit || "1"} onChange={set("min_deposit")} type="number" />
-              <Field label="Số dư tối đa nạp tiền ($)" id="max_deposit" value={form.max_deposit || "10000"} onChange={set("max_deposit")} type="number" />
+              <Field label="Số tiền nạp tối thiểu ($)" id="min_deposit" value={form.min_deposit || "1"} onChange={set("min_deposit")} type="number" description="Áp dụng trên trang Nạp tiền" />
+              <Field label="Số tiền nạp tối đa ($)" id="max_deposit" value={form.max_deposit || "10000"} onChange={set("max_deposit")} type="number" />
               <div className="flex items-center gap-3">
                 <Switch checked={form.maintenance_mode === "true"} onCheckedChange={() => toggle("maintenance_mode")} id="maintenance_mode" />
                 <Label htmlFor="maintenance_mode" className="text-red-600 font-medium">Chế độ bảo trì (tắt đặt hàng)</Label>
@@ -182,6 +246,23 @@ export default function AdminSettings() {
                 <Label htmlFor="registration_open">Cho phép đăng ký tài khoản mới</Label>
               </div>
             </SettingsSection>
+
+            <SettingsSection title="API Endpoint" description="URL kết nối API v2 cho panel khác">
+              <div className="flex items-center gap-2 p-3 bg-muted rounded-lg border font-mono text-sm">
+                <Globe className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className="flex-1 text-xs break-all">
+                  {typeof window !== "undefined" ? `${window.location.origin}/api/v2` : "/api/v2"}
+                </span>
+                <button onClick={() => {
+                  const url = `${window.location.origin}/api/v2`;
+                  navigator.clipboard.writeText(url);
+                }} className="p-1.5 hover:bg-background rounded transition-colors text-muted-foreground">
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">User dùng API Key từ trang Hồ sơ để kết nối. Xem tài liệu trong mục API.</p>
+            </SettingsSection>
+
             <Button onClick={() => save(["min_order_balance","min_deposit","max_deposit","maintenance_mode","registration_open"])} disabled={saving} className="gap-2">
               <Save className="w-4 h-4" />{saving ? "Đang lưu..." : "Lưu cài đặt hệ thống"}
             </Button>

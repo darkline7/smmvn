@@ -8,8 +8,6 @@ import { useGetProfile, useRegenerateApiKey, useGetMe } from "@workspace/api-cli
 import { useToast } from "@/hooks/use-toast";
 import { Key, Copy, RefreshCw, CheckCircle2, Code, Terminal, Globe, Zap, Eye, EyeOff } from "lucide-react";
 
-const BASE_API = "https://your-domain.com/api/v2";
-
 function CodeBlock({ code, lang }: { code: string; lang: string }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
@@ -40,7 +38,10 @@ export default function ApiKeyPage() {
   const regenMut = useRegenerateApiKey();
   const [showKey, setShowKey] = useState(false);
   const apiKey = profile?.apiKey || "your-api-key-here";
-  const maskedKey = apiKey.slice(0, 8) + "•".repeat(Math.max(0, apiKey.length - 12)) + apiKey.slice(-4);
+  const maskedKey = apiKey ? (apiKey.slice(0, 8) + "•".repeat(Math.max(0, apiKey.length - 12)) + apiKey.slice(-4)) : "";
+
+  const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
+  const BASE_API = `${window.location.origin}${BASE_URL}/api/v2`;
 
   const copyKey = () => {
     navigator.clipboard.writeText(apiKey);

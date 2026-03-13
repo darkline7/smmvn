@@ -4,11 +4,13 @@ import {
   usersTable, ordersTable, servicesTable, categoriesTable, providersTable,
   depositsTable, transactionsTable, ticketsTable, ticketMessagesTable,
   announcementsTable, apiRequestLogsTable, siteSettingsTable, orderLogsTable,
+  notificationsTable,
 } from "@workspace/db/schema";
 import { eq, and, desc, ilike, sql, or, gte, lte } from "drizzle-orm";
 import { requireAdmin } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
 import { z } from "zod";
+import { sendTelegramMessage } from "../lib/telegram.js";
 
 const router = Router();
 router.use(requireAdmin as any);
@@ -475,6 +477,58 @@ router.patch("/settings", async (req: AuthRequest, res: any) => {
     await db.insert(siteSettingsTable).values({ key, value: String(value) }).onConflictDoUpdate({ target: siteSettingsTable.key, set: { value: String(value), updatedAt: new Date() } });
   }
   return res.json(req.body);
+});
+
+// Aliases for admin payments page URL format
+router.post("/deposits/:id/approved", async (req: AuthRequest, res: any) => {
+  const deposit = await db.select().from(depositsTable).where(eq(depositsTable.id, Number(req.params.id))).limit(1);
+  if (!deposit[0]) return res.status(404).json({ error: "Not found" });
+  if (deposit[0].status !== "pending") return res.status(400).json({ error: "Already processed" });
+  const user = await db.select().from(usersTable).where(eq(usersTable.id, deposit[0].userId)).limit(1);
+  if (!user[0]) return res.status(404).json({ error: "User not found" });
+  const amount = Number(deposit[0].amount);
+  const newBalance = Number(user[0].balance) + amount;
+  await db.transaction(async tx => {
+    await tx.update(depositsTable).set({ status: "approved", adminNote: req.body?.adminNote || "Approved by admin", updatedAt: new Date() }).where(eq(depositsTable.id, deposit[0].id));
+    await tx.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, deposit[0].userId));
+    await tx.insert(transactionsTable).values({ userId: deposit[0].userId, type: "deposit", amount: amount.toFixed(4), balanceAfter: newBalance.toFixed(4), description: `Deposit approved #${deposit[0].id}`, referenceId: deposit[0].id });
+    await tx.insert(notificationsTable).values({ userId: deposit[0].userId, type: "deposit", title: "Nạp tiền thành công", message: `Tài khoản của bạn đã được cộng $${amount.toFixed(2)}. Số dư mới: $${newBalance.toFixed(2)}` });
+  });
+  return res.json({ success: true });
+});
+
+router.post("/deposits/:id/rejected", async (req: AuthRequest, res: any) => {
+  const deposit = await db.select().from(depositsTable).where(eq(depositsTable.id, Number(req.params.id))).limit(1);
+  if (!deposit[0]) return res.status(404).json({ error: "Not found" });
+  if (deposit[0].status !== "pending") return res.status(400).json({ error: "Already processed" });
+  await db.update(depositsTable).set({ status: "rejected", adminNote: req.body?.adminNote || "Rejected by admin", updatedAt: new Date() }).where(eq(depositsTable.id, deposit[0].id));
+  return res.json({ success: true });
+});
+
+// Alias for orders status update
+router.patch("/orders/:id/status", async (req: AuthRequest, res: any) => {
+  const { status } = req.body;
+  if (!status) return res.status(400).json({ error: "status required" });
+  const updated = await db.update(ordersTable).set({ status, updatedAt: new Date() }).where(eq(ordersTable.id, Number(req.params.id))).returning();
+  if (!updated[0]) return res.status(404).json({ error: "Not found" });
+  await db.insert(orderLogsTable).values({ orderId: Number(req.params.id), status, note: `Status changed to ${status} by admin` });
+  return res.json(updated[0]);
+});
+
+// Test Telegram
+router.post("/test-telegram", async (req: AuthRequest, res: any) => {
+  try {
+    const settings = await db.select().from(siteSettingsTable);
+    const s: Record<string, string> = {};
+    settings.forEach(r => { s[r.key] = r.value || ""; });
+    const token = s["telegram_bot_token"];
+    const chatId = s["telegram_admin_chat_id"];
+    if (!token || !chatId) return res.status(400).json({ ok: false, error: "Telegram bot token and chat ID not configured" });
+    const result = await sendTelegramMessage(token, chatId, "🧪 *Test Telegram* từ SMM Pro Admin Panel\n\nCấu hình Telegram hoạt động tốt! ✅");
+    return res.json({ ok: result, error: result ? null : "Failed to send message" });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 export default router;

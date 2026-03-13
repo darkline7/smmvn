@@ -84,7 +84,7 @@ export default function AdminServices() {
                       <TableCell className="font-mono text-muted-foreground">{s.id}</TableCell>
                       <TableCell className="font-medium max-w-[300px] truncate" title={s.name}>{s.name}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">{s.categoryName}</TableCell>
-                      <TableCell className="text-right font-display font-bold text-primary">${s.rate.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-display font-bold text-primary">${Number(s.rate||0).toFixed(2)}</TableCell>
                       <TableCell className="text-center text-sm text-muted-foreground">
                         {s.min} / {s.max}
                       </TableCell>

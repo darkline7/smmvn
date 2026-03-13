@@ -5,7 +5,8 @@ import {
   LayoutDashboard, ShoppingCart, ListOrdered, Layers, 
   Wallet, Receipt, Ticket as TicketIcon, Key, 
   User, Bell, LogOut, Menu, X, Users, Shield, Settings,
-  Database, Activity, Volume2, ShieldCheck, CreditCard
+  Database, Activity, Volume2, ShieldCheck, CreditCard,
+  Zap, Droplets, RefreshCw, UserPlus, Grid3X3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
@@ -19,26 +20,33 @@ type SidebarItem = {
 
 const userNav: SidebarItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "New Order", href: "/new-order", icon: ShoppingCart },
-  { title: "Orders History", href: "/orders", icon: ListOrdered },
-  { title: "Services", href: "/services", icon: Layers },
-  { title: "Add Funds", href: "/add-funds", icon: Wallet },
-  { title: "Transactions", href: "/transactions", icon: Receipt },
-  { title: "Support Tickets", href: "/tickets", icon: TicketIcon },
-  { title: "API Docs", href: "/api", icon: Key },
+  { title: "Đặt hàng mới", href: "/new-order", icon: ShoppingCart },
+  { title: "Lịch sử đơn hàng", href: "/orders", icon: ListOrdered },
+  { title: "Bảng giá dịch vụ", href: "/services-list", icon: Layers },
+  { title: "Đặt hàng hàng loạt", href: "/mass-order", icon: Zap },
+  { title: "Drip Feed", href: "/drip-feed", icon: Droplets },
+  { title: "Subscriptions", href: "/subscriptions", icon: RefreshCw },
+  { title: "Nạp tiền", href: "/add-funds", icon: Wallet },
+  { title: "Lịch sử giao dịch", href: "/transactions", icon: Receipt },
+  { title: "Hỗ trợ", href: "/tickets", icon: TicketIcon },
+  { title: "API", href: "/api", icon: Key },
+  { title: "Giới thiệu", href: "/referrals", icon: UserPlus },
+  { title: "Thông báo", href: "/notifications", icon: Bell },
+  { title: "Hồ sơ", href: "/profile", icon: User },
 ];
 
 const adminNav: SidebarItem[] = [
-  { title: "Overview", href: "/admin", icon: Activity },
+  { title: "Tổng quan", href: "/admin", icon: Activity },
   { title: "Users", href: "/admin/users", icon: Users },
-  { title: "Orders", href: "/admin/orders", icon: ListOrdered },
-  { title: "Services", href: "/admin/services", icon: Layers },
-  { title: "Categories", href: "/admin/categories", icon: Database },
+  { title: "Đơn hàng", href: "/admin/orders", icon: ListOrdered },
+  { title: "Dịch vụ", href: "/admin/services", icon: Layers },
+  { title: "Danh mục", href: "/admin/categories", icon: Database },
   { title: "Providers", href: "/admin/providers", icon: ShieldCheck },
-  { title: "Payments", href: "/admin/payments", icon: CreditCard },
-  { title: "Tickets", href: "/admin/tickets", icon: TicketIcon },
-  { title: "Announcements", href: "/admin/announcements", icon: Volume2 },
-  { title: "Settings", href: "/admin/settings", icon: Settings },
+  { title: "Nạp tiền", href: "/admin/payments", icon: CreditCard },
+  { title: "Hỗ trợ", href: "/admin/tickets", icon: TicketIcon },
+  { title: "Thông báo HT", href: "/admin/announcements", icon: Volume2 },
+  { title: "API Logs", href: "/admin/api-logs", icon: Grid3X3 },
+  { title: "Cài đặt", href: "/admin/settings", icon: Settings },
 ];
 
 export function DashboardLayout({ children, isAdminLayout = false }: { children: React.ReactNode, isAdminLayout?: boolean }) {

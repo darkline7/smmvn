@@ -10,6 +10,7 @@ import dashboardRouter from "./dashboard.js";
 import miscRouter from "./misc.js";
 import adminRouter from "./admin.js";
 import apiv2Router from "./apiv2.js";
+import sepayRouter from "./sepay.js";
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use("/dashboard", dashboardRouter);
 router.use("/", miscRouter);
 router.use("/admin", adminRouter);
 router.use("/v2", apiv2Router);
+router.use("/webhooks", sepayRouter);
 
 export default router;

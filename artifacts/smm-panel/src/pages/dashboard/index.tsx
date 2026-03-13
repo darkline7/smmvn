@@ -99,13 +99,14 @@ export default function Dashboard() {
                 ) : (
                    <div className="flex space-x-2 items-end h-full w-full p-4 pb-0">
                     {chartData?.data.map((d, i) => {
-                      const maxSpend = Math.max(...chartData.data.map(x => x.spend));
-                      const height = Math.max(10, (d.spend / maxSpend) * 100);
+                      const spendVal = Number(d.spend) || 0;
+                      const maxSpend = Math.max(...chartData.data.map(x => Number(x.spend) || 0));
+                      const height = Math.max(10, maxSpend > 0 ? (spendVal / maxSpend) * 100 : 10);
                       return (
                         <div key={i} className="flex-1 group relative flex justify-center h-full items-end">
                            <div className="bg-primary/20 hover:bg-primary/60 transition-colors w-full rounded-t-md relative" style={{ height: `${height}%` }}>
                               <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-foreground text-background text-xs py-1 px-2 rounded whitespace-nowrap z-20 pointer-events-none transition-opacity">
-                                {d.date}: ${d.spend.toFixed(2)}
+                                {d.date}: ${spendVal.toFixed(2)}
                               </div>
                            </div>
                         </div>
@@ -148,7 +149,7 @@ export default function Dashboard() {
                          } className="mb-1 capitalize">
                            {order.status}
                          </Badge>
-                         <p className="text-xs font-medium text-foreground">${order.charge.toFixed(2)}</p>
+                         <p className="text-xs font-medium text-foreground">${Number(order.charge || 0).toFixed(2)}</p>
                       </div>
                     </div>
                   ))}

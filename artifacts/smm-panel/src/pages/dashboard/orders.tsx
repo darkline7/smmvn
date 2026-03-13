@@ -140,7 +140,7 @@ export default function Orders() {
                           </a>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-medium">${order.charge.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-medium">${Number(order.charge||0).toFixed(2)}</TableCell>
                       <TableCell className="text-center text-sm">
                         <div className="flex flex-col items-center">
                            <span className="text-foreground">{order.startCount || '-'}</span>

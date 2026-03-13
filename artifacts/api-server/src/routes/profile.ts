@@ -51,4 +51,15 @@ router.post("/api-key", requireAuth as any, async (req: AuthRequest, res: Respon
   return res.json({ apiKey: newKey });
 });
 
+router.post("/password", requireAuth as any, async (req: AuthRequest, res: Response) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: "currentPassword and newPassword required" });
+  if (newPassword.length < 6) return res.status(400).json({ error: "Mật khẩu mới tối thiểu 6 ký tự" });
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1);
+  if (!user) return res.status(404).json({ error: "Not found" });
+  if (user.passwordHash !== hashPassword(currentPassword)) return res.status(400).json({ error: "Mật khẩu hiện tại không đúng" });
+  await db.update(usersTable).set({ passwordHash: hashPassword(newPassword), updatedAt: new Date() }).where(eq(usersTable.id, req.userId!));
+  return res.json({ success: true });
+});
+
 export default router;

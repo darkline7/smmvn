@@ -64,7 +64,7 @@ export default function NewOrder() {
   // Calculate price
   const price = useMemo(() => {
     if (!selectedService || !quantity) return 0;
-    return (quantity / 1000) * selectedService.rate;
+    return (quantity / 1000) * Number(selectedService.rate);
   }, [selectedService, quantity]);
 
   const onSubmit = (values: z.infer<typeof orderSchema>) => {
@@ -156,7 +156,7 @@ export default function NewOrder() {
                           <SelectContent>
                             {filteredServices.map(srv => (
                               <SelectItem key={srv.id} value={srv.id.toString()}>
-                                {srv.id} - {srv.name} (${srv.rate.toFixed(2)}/1k)
+                                {srv.id} - {srv.name} (${Number(srv.rate).toFixed(2)}/1k)
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -250,7 +250,7 @@ export default function NewOrder() {
                     <div className="p-5 grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Rate per 1000</p>
-                        <p className="font-bold text-lg text-foreground">${selectedService.rate.toFixed(2)}</p>
+                        <p className="font-bold text-lg text-foreground">${Number(selectedService.rate).toFixed(2)}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Avg. Time</p>

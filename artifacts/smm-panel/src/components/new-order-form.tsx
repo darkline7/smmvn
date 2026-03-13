@@ -256,12 +256,12 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
       {/* 2. Platform */}
       <div className="space-y-1">
         <Label className="text-sm font-medium">Nền tảng</Label>
-        <Select value={platform} onValueChange={setPlatform}>
+        <Select value={platform || "all"} onValueChange={val => setPlatform(val === "all" ? "" : val)}>
           <SelectTrigger className="bg-background h-11">
             <SelectValue placeholder="-- Chọn nền tảng --" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">🌐 Tất cả nền tảng</SelectItem>
+            <SelectItem value="all">🌐 Tất cả nền tảng</SelectItem>
             {platforms.map(p => (
               <SelectItem key={p} value={p}>
                 {PLATFORM_EMOJI[p] || "📦"} {p}

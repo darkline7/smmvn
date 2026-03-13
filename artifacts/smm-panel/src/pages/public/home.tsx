@@ -39,7 +39,6 @@ export default function Home() {
             <nav className="hidden md:flex gap-8">
               <Link href="/services" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Dịch vụ</Link>
               <Link href="/api-docs" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">API</Link>
-              <Link href="/pricing" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Bảng giá</Link>
               <Link href="/faq" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">FAQ</Link>
             </nav>
             <div className="flex items-center gap-3">
@@ -225,7 +224,6 @@ export default function Home() {
             <nav className="flex flex-wrap gap-6 text-sm text-muted-foreground justify-center">
               <Link href="/services" className="hover:text-foreground transition-colors">Dịch vụ</Link>
               <Link href="/api-docs" className="hover:text-foreground transition-colors">API</Link>
-              <Link href="/pricing" className="hover:text-foreground transition-colors">Bảng giá</Link>
               <Link href="/faq" className="hover:text-foreground transition-colors">FAQ</Link>
               <Link href="/login" className="hover:text-foreground transition-colors">Đăng nhập</Link>
             </nav>

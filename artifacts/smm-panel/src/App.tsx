@@ -39,7 +39,6 @@ const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
 const Home = lazy(() => import("./pages/public/home"));
 const Services = lazy(() => import("./pages/public/services"));
 const ApiDocs = lazy(() => import("./pages/public/api-docs"));
-const Pricing = lazy(() => import("./pages/public/pricing"));
 const FAQ = lazy(() => import("./pages/public/faq"));
 
 // Auth
@@ -149,7 +148,6 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/services" component={Services} />
         <Route path="/api-docs" component={ApiDocs} />
-        <Route path="/pricing" component={Pricing} />
         <Route path="/faq" component={FAQ} />
 
         {/* Auth */}

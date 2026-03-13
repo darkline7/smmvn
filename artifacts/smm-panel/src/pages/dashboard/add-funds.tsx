@@ -2,18 +2,29 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useListDeposits, useGetBalance } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { Wallet, Building2, QrCode, Copy, CheckCircle2, Clock, XCircle, RefreshCw, Info, Loader2 } from "lucide-react";
+import { Wallet, Building2, QrCode, Copy, CheckCircle2, Clock, XCircle, RefreshCw, Info, Loader2, CreditCard, Smartphone } from "lucide-react";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
+
+const TELCOS = [
+  { value: "VIETTEL", label: "Viettel" },
+  { value: "MOBIFONE", label: "MobiFone" },
+  { value: "VINAPHONE", label: "Vinaphone" },
+  { value: "VIETNAMOBILE", label: "Vietnamobile" },
+  { value: "GMOBILE", label: "Gmobile" },
+  { value: "REDDI", label: "Reddi" },
+];
+const CARD_AMOUNTS = [10000, 20000, 50000, 100000, 200000, 500000];
 
 const statusMap: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   pending: { label: "Đang xử lý", color: "text-yellow-600 bg-yellow-50 border-yellow-200", icon: Clock },
@@ -21,9 +32,24 @@ const statusMap: Record<string, { label: string; color: string; icon: typeof Clo
   rejected: { label: "Từ chối", color: "text-red-600 bg-red-50 border-red-200", icon: XCircle },
 };
 
+const cardSchema = z.object({
+  telco: z.enum(["VIETTEL", "MOBIFONE", "VINAPHONE", "VIETNAMOBILE", "GMOBILE", "REDDI"] as const),
+  serial: z.string().min(5, "Nhập số seri thẻ"),
+  code: z.string().min(5, "Nhập mã thẻ"),
+  amount: z.number({ required_error: "Chọn mệnh giá" }),
+});
+
+const cardStatusMap: Record<number, { label: string; color: string }> = {
+  1: { label: "Thành công", color: "text-green-600 bg-green-50 border-green-200" },
+  2: { label: "Đang xử lý", color: "text-yellow-600 bg-yellow-50 border-yellow-200" },
+  3: { label: "Thẻ lỗi", color: "text-red-600 bg-red-50 border-red-200" },
+  99: { label: "Bảo trì", color: "text-gray-600 bg-gray-50 border-gray-200" },
+};
+
 export default function AddFunds() {
   const { toast } = useToast();
-  const { data: balance } = useGetBalance();
+  const qc = useQueryClient();
+  const { data: balance, refetch: refetchBalance } = useGetBalance();
   const { data: depositsData, isLoading, refetch } = useListDeposits();
   const [pendingDeposit, setPendingDeposit] = useState<any>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -65,6 +91,50 @@ export default function AddFunds() {
     resolver: zodResolver(depositSchema),
     defaultValues: { amount: Math.max(minDeposit, 10) },
   });
+
+  // ── Thẻ cào form ──────────────────────────────────────────────────────
+  const cardForm = useForm<z.infer<typeof cardSchema>>({
+    resolver: zodResolver(cardSchema),
+    defaultValues: { telco: "VIETTEL", serial: "", code: "", amount: 50000 },
+  });
+
+  const { data: cardsData, refetch: refetchCards } = useQuery({
+    queryKey: ["cards"],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/wallet/cards`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const cardMut = useMutation({
+    mutationFn: async (values: z.infer<typeof cardSchema>) => {
+      const res = await fetch(`${BASE}/api/wallet/cards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(values),
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      refetchCards();
+      refetchBalance();
+      qc.invalidateQueries({ queryKey: ["balance"] });
+      if (data.status === 1) {
+        toast({ title: "Nạp thẻ thành công!", description: `Đã cộng ${data.usdCredited ? formatCurrency(Number(data.usdCredited)) : ""} vào tài khoản` });
+        cardForm.reset({ telco: "VIETTEL", serial: "", code: "", amount: 50000 });
+      } else if (data.status === 2) {
+        toast({ title: "Thẻ đang xử lý", description: "Hệ thống sẽ cộng tiền sau khi xác nhận (~vài phút)" });
+      } else if (data.error) {
+        toast({ title: "Lỗi", description: data.error, variant: "destructive" });
+      } else {
+        toast({ title: "Nạp thẻ thất bại", description: data.message || "Thẻ không hợp lệ", variant: "destructive" });
+      }
+    },
+    onError: () => toast({ title: "Lỗi kết nối", variant: "destructive" }),
+  });
+  // ───────────────────────────────────────────────────────────────────────
 
   const amount = form.watch("amount") || minDeposit;
   const vndAmount = Math.round(amount * vndRate);
@@ -135,9 +205,10 @@ export default function AddFunds() {
         </div>
 
         <Tabs defaultValue="bank">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="bank" className="gap-2"><Building2 className="w-4 h-4" />Chuyển khoản ngân hàng</TabsTrigger>
-            <TabsTrigger value="history" className="gap-2"><Clock className="w-4 h-4" />Lịch sử nạp tiền</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsTrigger value="bank" className="gap-1.5"><Building2 className="w-4 h-4" />Ngân hàng</TabsTrigger>
+            <TabsTrigger value="card" className="gap-1.5"><Smartphone className="w-4 h-4" />Thẻ cào</TabsTrigger>
+            <TabsTrigger value="history" className="gap-1.5"><Clock className="w-4 h-4" />Lịch sử</TabsTrigger>
           </TabsList>
 
           <TabsContent value="bank" className="space-y-6">
@@ -249,6 +320,105 @@ export default function AddFunds() {
                   </CardContent>
                 </Card>
               )}
+            </div>
+          </TabsContent>
+
+          {/* ── Thẻ Cào Tab ── */}
+          <TabsContent value="card" className="space-y-6">
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex gap-3">
+              <Info className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-amber-700 dark:text-amber-300">
+                <strong>Nạp thẻ cào điện thoại</strong> – Hỗ trợ Viettel, MobiFone, Vinaphone, Vietnamobile, Gmobile, Reddi.
+                Thẻ được xử lý tự động qua đối tác <strong>thesieure.com</strong>. Thẻ lỗi/sai mệnh giá sẽ bị trừ phí.
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-6">
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2"><Smartphone className="w-5 h-5 text-primary" />Nhập thông tin thẻ</CardTitle>
+                  <CardDescription>Điền đầy đủ thông tin thẻ cào điện thoại</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...cardForm}>
+                    <form onSubmit={cardForm.handleSubmit(v => cardMut.mutate(v))} className="space-y-4">
+                      <FormField control={cardForm.control} name="telco" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nhà mạng</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Chọn nhà mạng" /></SelectTrigger></FormControl>
+                            <SelectContent>{TELCOS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={cardForm.control} name="amount" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Mệnh giá</FormLabel>
+                          <div className="grid grid-cols-3 gap-2">
+                            {CARD_AMOUNTS.map(a => (
+                              <button key={a} type="button" onClick={() => field.onChange(a)}
+                                className={`py-2 px-2 rounded-lg border text-sm font-medium transition-all ${field.value === a ? "bg-primary text-primary-foreground border-primary" : "border-border hover:border-primary/50 hover:bg-muted"}`}>
+                                {a.toLocaleString("vi-VN")}đ
+                              </button>
+                            ))}
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={cardForm.control} name="serial" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Số seri thẻ</FormLabel>
+                          <FormControl><Input placeholder="Nhập số seri in trên thẻ" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={cardForm.control} name="code" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Mã thẻ</FormLabel>
+                          <FormControl><Input placeholder="Nhập mã cào (dưới lớp bạc)" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <Button type="submit" className="w-full" size="lg" disabled={cardMut.isPending}>
+                        {cardMut.isPending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Đang nạp...</> : "Nạp thẻ ngay →"}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/50 shadow-sm">
+                <CardHeader className="flex-row items-center justify-between">
+                  <CardTitle className="text-lg">Lịch sử thẻ cào</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => refetchCards()} className="gap-2"><RefreshCw className="w-4 h-4" />Làm mới</Button>
+                </CardHeader>
+                <CardContent>
+                  {!cardsData?.cards?.length ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <CreditCard className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">Chưa có lịch sử nạp thẻ</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                      {cardsData.cards.map((c: any) => {
+                        const st = cardStatusMap[c.status] || { label: "Không rõ", color: "text-gray-600 bg-gray-50 border-gray-200" };
+                        return (
+                          <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border bg-card gap-2">
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm">{c.telco} · {Number(c.declaredAmount).toLocaleString("vi-VN")}đ</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{format(new Date(c.createdAt), "dd/MM HH:mm")}</p>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              {c.usdCredited && <p className="text-xs font-bold text-green-600">+{formatCurrency(Number(c.usdCredited))}</p>}
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${st.color}`}>{st.label}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 

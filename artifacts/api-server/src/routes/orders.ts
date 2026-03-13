@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { ordersTable, orderLogsTable, servicesTable, usersTable, transactionsTable, notificationsTable } from "@workspace/db/schema";
+import { ordersTable, orderLogsTable, servicesTable, usersTable, transactionsTable, notificationsTable, providersTable } from "@workspace/db/schema";
 import { eq, and, desc, ilike, sql, inArray } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
+import { callProviderApi } from "../lib/provider.js";
 import { z } from "zod";
 
 const router = Router();
@@ -105,8 +106,43 @@ router.post("/", requireAuth as any, async (req: AuthRequest, res: any) => {
       db.insert(orderLogsTable).values({ orderId: order.id, status: "pending", note: "Order created" }),
     ]);
 
+    // Forward order to provider API if service has a provider
+    if (service[0].providerId && service[0].providerServiceId) {
+      try {
+        const provider = await db.select().from(providersTable).where(eq(providersTable.id, service[0].providerId)).limit(1);
+        if (provider[0]?.baseUrl && provider[0]?.apiKey) {
+          const params: Record<string, string> = {
+            action: "add",
+            service: service[0].providerServiceId,
+            link: data.link,
+            quantity: String(data.quantity),
+          };
+          if (data.runs) params.runs = String(data.runs);
+          if (data.interval) params.interval = String(data.interval);
+          if (data.comments) params.comments = data.comments;
+          if (data.username) params.username = data.username;
+
+          const resp = await callProviderApi(provider[0].baseUrl, provider[0].apiKey, params, 30000);
+          const json = await resp.json() as any;
+
+          if (json?.order) {
+            await Promise.all([
+              db.update(ordersTable).set({ providerOrderId: String(json.order), status: "processing", updatedAt: new Date() }).where(eq(ordersTable.id, order.id)),
+              db.insert(orderLogsTable).values({ orderId: order.id, status: "processing", note: `Provider order ID: ${json.order}` }),
+            ]);
+          } else if (json?.error) {
+            await db.insert(orderLogsTable).values({ orderId: order.id, status: "pending", note: `Provider error: ${json.error}` });
+          }
+        }
+      } catch (provErr: any) {
+        // Log but don't fail the order — it stays "pending" for manual review
+        await db.insert(orderLogsTable).values({ orderId: order.id, status: "pending", note: `Provider call failed: ${provErr.message}` });
+      }
+    }
+
+    const finalOrder = await db.select().from(ordersTable).where(eq(ordersTable.id, order.id)).limit(1);
     return res.status(201).json({
-      ...order,
+      ...finalOrder[0],
       serviceName: service[0].name,
     });
   } catch (e: any) {

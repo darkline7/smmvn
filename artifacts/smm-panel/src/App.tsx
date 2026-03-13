@@ -59,7 +59,6 @@ const Referrals = lazy(() => import("./pages/dashboard/referrals"));
 const ServicesList = lazy(() => import("./pages/dashboard/services-list"));
 const MassOrder = lazy(() => import("./pages/dashboard/mass-order"));
 const DripFeed = lazy(() => import("./pages/dashboard/drip-feed"));
-const Subscriptions = lazy(() => import("./pages/dashboard/subscriptions"));
 const SubdomainsPage = lazy(() => import("./pages/dashboard/subdomains"));
 
 // Admin
@@ -170,7 +169,6 @@ function Router() {
         <Route path="/services-list" component={ServicesList} />
         <Route path="/mass-order" component={MassOrder} />
         <Route path="/drip-feed" component={DripFeed} />
-        <Route path="/subscriptions" component={Subscriptions} />
         <Route path="/subdomains" component={SubdomainsPage} />
 
         {/* Admin */}

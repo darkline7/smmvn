@@ -60,3 +60,20 @@ export type Announcement = typeof announcementsTable.$inferSelect;
 export type Notification = typeof notificationsTable.$inferSelect;
 export type SiteSetting = typeof siteSettingsTable.$inferSelect;
 export type ApiRequestLog = typeof apiRequestLogsTable.$inferSelect;
+
+export const cardChargesTable = pgTable("card_charges", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  telco: text("telco").notNull(),
+  serial: text("serial").notNull(),
+  code: text("code").notNull(),
+  declaredAmount: integer("declared_amount").notNull(),
+  actualAmount: numeric("actual_amount", { precision: 12, scale: 2 }),
+  requestId: text("request_id").notNull().unique(),
+  status: integer("status").notNull().default(2),
+  message: text("message"),
+  usdCredited: numeric("usd_credited", { precision: 10, scale: 4 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+export type CardCharge = typeof cardChargesTable.$inferSelect;

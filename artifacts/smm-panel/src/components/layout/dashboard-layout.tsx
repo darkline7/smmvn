@@ -6,7 +6,7 @@ import {
   Wallet, Receipt, Ticket as TicketIcon, Key, 
   User, Bell, LogOut, Menu, X, Users, Shield, Settings,
   Database, Activity, Volume2, ShieldCheck, CreditCard,
-  Zap, RefreshCw, UserPlus, Grid3X3, Globe
+  Zap, UserPlus, Grid3X3, Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, cn } from "@/lib/utils";
@@ -23,7 +23,6 @@ const userNav: SidebarItem[] = [
   { title: "Lịch sử đơn hàng", href: "/orders", icon: ListOrdered },
   { title: "Bảng giá dịch vụ", href: "/services-list", icon: Layers },
   { title: "Đặt hàng hàng loạt", href: "/mass-order", icon: Zap },
-  { title: "Subscriptions", href: "/subscriptions", icon: RefreshCw },
   { title: "Nạp tiền", href: "/add-funds", icon: Wallet },
   { title: "Lịch sử giao dịch", href: "/transactions", icon: Receipt },
   { title: "Hỗ trợ", href: "/tickets", icon: TicketIcon },

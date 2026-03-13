@@ -49,17 +49,16 @@ export default function ServicesList() {
   const { data: catData } = useListCategories();
   const { data: srvData, isLoading } = useListServices();
 
-  // Compute platforms from categories
+  // Compute platforms preserving provider source order (no re-sort)
   const platforms = useMemo(() => {
     const cats = catData?.categories || [];
-    const pSet = new Set<string>();
-    cats.forEach(c => pSet.add(detectPlatform(c.name)));
-    return Array.from(pSet).sort((a, b) => {
-      const order = ["Instagram", "Facebook", "TikTok", "YouTube", "Twitter/X", "Telegram"];
-      const ai = order.indexOf(a), bi = order.indexOf(b);
-      if (ai === -1 && bi === -1) return a.localeCompare(b);
-      if (ai === -1) return 1; if (bi === -1) return -1; return ai - bi;
-    });
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const c of cats) {
+      const p = detectPlatform(c.name);
+      if (!seen.has(p)) { seen.add(p); result.push(p); }
+    }
+    return result;
   }, [catData]);
 
   // Filter categories by platform

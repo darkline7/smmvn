@@ -27,6 +27,7 @@ const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: "telegram_notify_new_ticket", value: "true" },
   { key: "maintenance_mode", value: "false" },
   { key: "registration_open", value: "true" },
+  { key: "cron_secret", value: "" },
 ];
 
 async function ensureSettings() {

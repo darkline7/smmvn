@@ -10,7 +10,9 @@ export const providersTable = pgTable("providers", {
   baseUrl: text("base_url").notNull(),
   apiKey: text("api_key").notNull(),
   status: providerStatusEnum("status").notNull().default("active"),
+  markupPercent: text("markup_percent").notNull().default("25"),
   notes: text("notes"),
+  lastSyncAt: timestamp("last_sync_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

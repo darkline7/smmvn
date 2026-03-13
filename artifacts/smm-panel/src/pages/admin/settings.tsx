@@ -247,6 +247,17 @@ export default function AdminSettings() {
               </div>
             </SettingsSection>
 
+            <SettingsSection title="Cron Secret" description="Bảo vệ cron links tự động cập nhật giá & dịch vụ từ web nguồn">
+              <Field
+                label="Cron Secret Key"
+                id="cron_secret"
+                value={form.cron_secret || ""}
+                onChange={set("cron_secret")}
+                placeholder="Đặt một chuỗi bí mật, ví dụ: MySecretCron2025!"
+                description="Dán vào cron link: /api/cron/sync-all?secret=YOUR_SECRET — Sau khi lưu, vào trang Kết nối API để copy link cron."
+              />
+            </SettingsSection>
+
             <SettingsSection title="API Endpoint" description="URL kết nối API v2 cho panel khác">
               <div className="flex items-center gap-2 p-3 bg-muted rounded-lg border font-mono text-sm">
                 <Globe className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -263,7 +274,7 @@ export default function AdminSettings() {
               <p className="text-xs text-muted-foreground">User dùng API Key từ trang Hồ sơ để kết nối. Xem tài liệu trong mục API.</p>
             </SettingsSection>
 
-            <Button onClick={() => save(["min_order_balance","min_deposit","max_deposit","maintenance_mode","registration_open"])} disabled={saving} className="gap-2">
+            <Button onClick={() => save(["min_order_balance","min_deposit","max_deposit","maintenance_mode","registration_open","cron_secret"])} disabled={saving} className="gap-2">
               <Save className="w-4 h-4" />{saving ? "Đang lưu..." : "Lưu cài đặt hệ thống"}
             </Button>
           </TabsContent>

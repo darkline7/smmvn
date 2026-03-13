@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { announcementsTable, notificationsTable, referralsTable, usersTable, siteSettingsTable } from "@workspace/db/schema";
+import { announcementsTable, notificationsTable, referralsTable, usersTable, siteSettingsTable, providersTable, servicesTable, categoriesTable } from "@workspace/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
@@ -86,6 +86,101 @@ router.get("/referrals", requireAuth as any, async (req: AuthRequest, res: any) 
     commissionRate: 0.05,
     history,
   });
+});
+
+// ---- CRON endpoints (no auth — protected by cron_secret query param) ----
+
+async function getSettings(): Promise<Record<string, string>> {
+  const rows = await db.select().from(siteSettingsTable);
+  const s: Record<string, string> = {};
+  rows.forEach(r => { s[r.key] = r.value || ""; });
+  return s;
+}
+
+async function syncOneProvider(provider: typeof providersTable.$inferSelect): Promise<{ added: number; updated: number; total: number; error?: string }> {
+  const markup = 1 + (Number(provider.markupPercent) || 25) / 100;
+  try {
+    const resp = await fetch(`${provider.baseUrl}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `key=${encodeURIComponent(provider.apiKey)}&action=services`,
+      signal: AbortSignal.timeout(30000),
+    });
+    const services: any[] = await resp.json();
+    if (!Array.isArray(services)) return { added: 0, updated: 0, total: 0, error: "Provider không trả về danh sách" };
+
+    let cat = await db.select().from(categoriesTable).where(eq(categoriesTable.name, provider.name)).limit(1);
+    if (!cat[0]) {
+      const [newCat] = await db.insert(categoriesTable).values({ name: provider.name, description: `Dịch vụ từ ${provider.name}`, sortOrder: 99 }).returning();
+      cat = [newCat];
+    }
+    const categoryId = cat[0].id;
+
+    let added = 0;
+    let updated = 0;
+    for (const s of services.slice(0, 2000)) {
+      try {
+        const providerServiceId = String(s.service);
+        const newRate = Number((Number(s.rate) * markup).toFixed(6)).toString();
+        const min = Number(s.min) || 10;
+        const max = Number(s.max) || 100000;
+        const existing = await db.select({ id: servicesTable.id }).from(servicesTable)
+          .where(eq(servicesTable.providerServiceId, providerServiceId)).limit(1);
+        if (existing[0]) {
+          await db.update(servicesTable).set({ rate: newRate, min, max, updatedAt: new Date() }).where(eq(servicesTable.id, existing[0].id));
+          updated++;
+        } else {
+          await db.insert(servicesTable).values({
+            categoryId, name: s.name || `Service #${s.service}`, description: s.category || "",
+            providerId: provider.id, providerServiceId, type: "default",
+            rate: newRate, min, max, status: "inactive",
+          });
+          added++;
+        }
+      } catch {}
+    }
+    await db.update(providersTable).set({ lastSyncAt: new Date(), status: "active", updatedAt: new Date() }).where(eq(providersTable.id, provider.id));
+    return { added, updated, total: added + updated };
+  } catch (e: any) {
+    return { added: 0, updated: 0, total: 0, error: e.message };
+  }
+}
+
+// GET /api/cron/sync-all?secret=xxx  — sync all active providers
+router.get("/cron/sync-all", async (req, res) => {
+  try {
+    const settings = await getSettings();
+    const cronSecret = settings["cron_secret"] || "";
+    if (!cronSecret || req.query.secret !== cronSecret) {
+      return res.status(401).json({ error: "Invalid cron secret" });
+    }
+    const providers = await db.select().from(providersTable).where(eq(providersTable.status, "active"));
+    const results = await Promise.allSettled(providers.map(p => syncOneProvider(p)));
+    const summary = results.map((r, i) => ({
+      provider: providers[i].name,
+      ...(r.status === "fulfilled" ? r.value : { error: String(r.reason) }),
+    }));
+    return res.json({ success: true, synced: providers.length, results: summary, timestamp: new Date().toISOString() });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/cron/sync/:id?secret=xxx  — sync single provider by ID
+router.get("/cron/sync/:id", async (req, res) => {
+  try {
+    const settings = await getSettings();
+    const cronSecret = settings["cron_secret"] || "";
+    if (!cronSecret || req.query.secret !== cronSecret) {
+      return res.status(401).json({ error: "Invalid cron secret" });
+    }
+    const [provider] = await db.select().from(providersTable).where(eq(providersTable.id, Number(req.params.id))).limit(1);
+    if (!provider) return res.status(404).json({ error: "Provider not found" });
+    const result = await syncOneProvider(provider);
+    return res.json({ success: !result.error, provider: provider.name, ...result, timestamp: new Date().toISOString() });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
 });
 
 export default router;

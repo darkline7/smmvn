@@ -226,21 +226,26 @@ router.delete("/categories/:id", async (req: AuthRequest, res: any) => {
 // PROVIDERS
 router.get("/providers", async (req: AuthRequest, res: any) => {
   const rows = await db.select({
-    id: providersTable.id, name: providersTable.name, baseUrl: providersTable.baseUrl,
-    status: providersTable.status, notes: providersTable.notes, createdAt: providersTable.createdAt,
+    id: providersTable.id,
+    name: providersTable.name,
+    baseUrl: providersTable.baseUrl,
+    status: providersTable.status,
+    markupPercent: providersTable.markupPercent,
+    lastSyncAt: providersTable.lastSyncAt,
+    notes: providersTable.notes,
+    createdAt: providersTable.createdAt,
     serviceCount: sql<number>`(SELECT COUNT(*) FROM services WHERE provider_id = providers.id)`,
-    balance: providersTable.notes, // will be overridden below
   }).from(providersTable).orderBy(providersTable.name);
-  // Map baseUrl -> url so frontend receives the expected field name
-  const providers = rows.map(({ baseUrl, balance: _b, ...rest }) => ({ ...rest, url: baseUrl }));
+  const providers = rows.map(({ baseUrl, ...rest }) => ({ ...rest, url: baseUrl }));
   return res.json({ providers });
 });
 
 router.post("/providers", async (req: AuthRequest, res: any) => {
   try {
-    const { url, apiKey, name, notes } = req.body;
+    const { url, apiKey, name, notes, markupPercent } = req.body;
     const [provider] = await db.insert(providersTable).values({
       name, baseUrl: url, apiKey, notes: notes || "",
+      markupPercent: markupPercent ? String(markupPercent) : "25",
     }).returning();
     const { apiKey: _ak, baseUrl: _bu, ...safe } = provider;
     return res.status(201).json({ ...safe, url });
@@ -250,13 +255,14 @@ router.post("/providers", async (req: AuthRequest, res: any) => {
 });
 
 router.patch("/providers/:id", async (req: AuthRequest, res: any) => {
-  const { url, apiKey, name, notes, status } = req.body;
+  const { url, apiKey, name, notes, status, markupPercent } = req.body;
   const updateData: any = { updatedAt: new Date() };
   if (name !== undefined) updateData.name = name;
   if (url !== undefined) updateData.baseUrl = url;
-  if (apiKey && apiKey.trim()) updateData.apiKey = apiKey; // only update if non-empty
+  if (apiKey && apiKey.trim()) updateData.apiKey = apiKey;
   if (notes !== undefined) updateData.notes = notes;
   if (status !== undefined) updateData.status = status;
+  if (markupPercent !== undefined) updateData.markupPercent = String(markupPercent);
   const updated = await db.update(providersTable).set(updateData).where(eq(providersTable.id, Number(req.params.id))).returning();
   if (!updated[0]) return res.status(404).json({ error: "Not found" });
   const { apiKey: _ak, baseUrl, ...safe } = updated[0];
@@ -280,7 +286,6 @@ router.post("/providers/:id/test", async (req: AuthRequest, res: any) => {
     });
     const data: any = await resp.json();
     if (data?.balance !== undefined) {
-      // Update balance in notes for display
       await db.update(providersTable).set({ status: "active", updatedAt: new Date() }).where(eq(providersTable.id, provider[0].id));
       return res.json({ success: true, balance: data.balance });
     }
@@ -290,49 +295,82 @@ router.post("/providers/:id/test", async (req: AuthRequest, res: any) => {
   }
 });
 
-router.post("/providers/:id/sync", async (req: AuthRequest, res: any) => {
-  const provider = await db.select().from(providersTable).where(eq(providersTable.id, Number(req.params.id))).limit(1);
-  if (!provider[0]) return res.status(404).json({ error: "Not found" });
+// Shared sync logic — returns { added, updated, total }
+async function syncProviderServices(provider: any): Promise<{ added: number; updated: number; total: number; error?: string }> {
+  const markup = 1 + (Number(provider.markupPercent) || 25) / 100;
   try {
-    const resp = await fetch(`${provider[0].baseUrl}`, {
+    const resp = await fetch(`${provider.baseUrl}`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `key=${encodeURIComponent(provider[0].apiKey)}&action=services`,
+      body: `key=${encodeURIComponent(provider.apiKey)}&action=services`,
       signal: AbortSignal.timeout(30000),
     });
     const services: any[] = await resp.json();
-    if (!Array.isArray(services)) return res.json({ synced: 0, message: "Provider không trả về danh sách dịch vụ" });
+    if (!Array.isArray(services)) return { added: 0, updated: 0, total: 0, error: "Provider không trả về danh sách dịch vụ" };
 
-    // Get or create a default category for this provider
-    let cat = await db.select().from(categoriesTable).where(eq(categoriesTable.name, provider[0].name)).limit(1);
+    let cat = await db.select().from(categoriesTable).where(eq(categoriesTable.name, provider.name)).limit(1);
     if (!cat[0]) {
-      const [newCat] = await db.insert(categoriesTable).values({ name: provider[0].name, description: `Dịch vụ từ ${provider[0].name}`, sortOrder: 99 }).returning();
+      const [newCat] = await db.insert(categoriesTable).values({ name: provider.name, description: `Dịch vụ từ ${provider.name}`, sortOrder: 99 }).returning();
       cat = [newCat];
     }
     const categoryId = cat[0].id;
 
-    let synced = 0;
-    for (const s of services.slice(0, 1000)) {
+    let added = 0;
+    let updated = 0;
+    for (const s of services.slice(0, 2000)) {
       try {
-        await db.insert(servicesTable).values({
-          categoryId,
-          name: s.name || `Service #${s.service}`,
-          description: s.category || "",
-          providerId: provider[0].id,
-          providerServiceId: String(s.service),
-          type: "default",
-          rate: Number((Number(s.rate) * 1.25).toFixed(6)).toString(),
-          min: Number(s.min) || 10,
-          max: Number(s.max) || 100000,
-          status: "inactive",
-        }).onConflictDoNothing();
-        synced++;
+        const providerServiceId = String(s.service);
+        const newRate = Number((Number(s.rate) * markup).toFixed(6)).toString();
+        const min = Number(s.min) || 10;
+        const max = Number(s.max) || 100000;
+        const name = s.name || `Service #${s.service}`;
+
+        const existing = await db.select({ id: servicesTable.id })
+          .from(servicesTable)
+          .where(eq(servicesTable.providerServiceId, providerServiceId))
+          .limit(1);
+
+        if (existing[0]) {
+          // UPDATE existing: refresh price, min, max
+          await db.update(servicesTable).set({
+            rate: newRate, min, max, updatedAt: new Date(),
+          }).where(eq(servicesTable.id, existing[0].id));
+          updated++;
+        } else {
+          await db.insert(servicesTable).values({
+            categoryId, name, description: s.category || "",
+            providerId: provider.id, providerServiceId, type: "default",
+            rate: newRate, min, max, status: "inactive",
+          });
+          added++;
+        }
       } catch {}
     }
-    return res.json({ synced, message: `Đã đồng bộ ${synced} dịch vụ từ ${provider[0].name}` });
+
+    await db.update(providersTable).set({ lastSyncAt: new Date(), status: "active", updatedAt: new Date() }).where(eq(providersTable.id, provider.id));
+    return { added, updated, total: added + updated };
   } catch (e: any) {
-    return res.json({ synced: 0, message: e.message });
+    return { added: 0, updated: 0, total: 0, error: e.message };
   }
+}
+
+router.post("/providers/:id/sync", async (req: AuthRequest, res: any) => {
+  const [provider] = await db.select().from(providersTable).where(eq(providersTable.id, Number(req.params.id))).limit(1);
+  if (!provider) return res.status(404).json({ error: "Not found" });
+  const result = await syncProviderServices(provider);
+  if (result.error) return res.json({ success: false, ...result });
+  return res.json({ success: true, ...result, message: `Thêm ${result.added} mới, cập nhật giá ${result.updated} dịch vụ từ ${provider.name}` });
+});
+
+// Sync all active providers — for cron
+router.post("/providers/sync-all", async (req: AuthRequest, res: any) => {
+  const providers = await db.select().from(providersTable).where(eq(providersTable.status, "active"));
+  const results = await Promise.allSettled(providers.map(p => syncProviderServices(p)));
+  const summary = results.map((r, i) => ({
+    provider: providers[i].name,
+    ...(r.status === "fulfilled" ? r.value : { error: String(r.reason) }),
+  }));
+  return res.json({ success: true, results: summary });
 });
 
 // PAYMENTS

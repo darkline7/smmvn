@@ -6,7 +6,7 @@ import {
   Wallet, Receipt, Ticket as TicketIcon, Key, 
   User, Bell, LogOut, Menu, X, Users, Shield, Settings,
   Database, Activity, Volume2, ShieldCheck, CreditCard,
-  Zap, Droplets, RefreshCw, UserPlus, Grid3X3
+  Zap, RefreshCw, UserPlus, Grid3X3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
@@ -20,11 +20,9 @@ type SidebarItem = {
 
 const userNav: SidebarItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Đặt hàng mới", href: "/new-order", icon: ShoppingCart },
   { title: "Lịch sử đơn hàng", href: "/orders", icon: ListOrdered },
   { title: "Bảng giá dịch vụ", href: "/services-list", icon: Layers },
   { title: "Đặt hàng hàng loạt", href: "/mass-order", icon: Zap },
-  { title: "Drip Feed", href: "/drip-feed", icon: Droplets },
   { title: "Subscriptions", href: "/subscriptions", icon: RefreshCw },
   { title: "Nạp tiền", href: "/add-funds", icon: Wallet },
   { title: "Lịch sử giao dịch", href: "/transactions", icon: Receipt },

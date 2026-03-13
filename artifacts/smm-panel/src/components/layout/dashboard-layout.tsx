@@ -9,9 +9,8 @@ import {
   Zap, RefreshCw, UserPlus, Grid3X3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
 
 type SidebarItem = {
   title: string;

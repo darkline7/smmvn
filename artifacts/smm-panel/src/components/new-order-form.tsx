@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -7,24 +7,22 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useListCategories, useCreateOrder, useGetMe } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { Info, Clock, RefreshCw, XCircle, Zap, Link as LinkIcon, Hash, Loader2 } from "lucide-react";
+import { Loader2, Link as LinkIcon, Search, Clipboard, Info, RefreshCw, XCircle, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
 
 const orderSchema = z.object({
-  categoryId: z.string().min(1, "Chọn danh mục"),
   serviceId: z.coerce.number().min(1, "Chọn dịch vụ"),
-  link: z.string().url("URL không hợp lệ"),
+  link: z.string().min(1, "Nhập link"),
   quantity: z.coerce.number().min(1),
 });
 
-// Detect platform from category name
 function detectPlatform(name: string): string {
   const n = name.toLowerCase();
   if (n.includes("instagram")) return "Instagram";
@@ -46,48 +44,21 @@ function detectPlatform(name: string): string {
   return "Khác";
 }
 
-const PLATFORM_COLORS: Record<string, string> = {
-  Instagram: "from-pink-500 to-purple-600",
-  Facebook: "from-blue-600 to-blue-700",
-  TikTok: "from-black to-gray-800",
-  YouTube: "from-red-600 to-red-700",
-  "Twitter/X": "from-gray-900 to-black",
-  Telegram: "from-sky-500 to-blue-600",
-  Spotify: "from-green-500 to-green-700",
-  Discord: "from-indigo-500 to-violet-600",
-  LinkedIn: "from-blue-700 to-blue-800",
-  Snapchat: "from-yellow-400 to-yellow-500",
-  Pinterest: "from-red-600 to-red-700",
-  Twitch: "from-purple-600 to-violet-700",
-  Kick: "from-green-600 to-green-700",
-  Threads: "from-gray-800 to-black",
-  SoundCloud: "from-orange-500 to-orange-700",
-  "Website/SEO": "from-teal-500 to-cyan-600",
-  "Khác": "from-gray-500 to-gray-600",
-};
-
 const PLATFORM_EMOJIS: Record<string, string> = {
-  Instagram: "📸",
-  Facebook: "👤",
-  TikTok: "🎵",
-  YouTube: "▶️",
-  "Twitter/X": "🐦",
-  Telegram: "✈️",
-  Spotify: "🎧",
-  Discord: "💬",
-  LinkedIn: "💼",
-  Snapchat: "👻",
-  Pinterest: "📌",
-  Twitch: "🎮",
-  Kick: "⚡",
-  Threads: "🧵",
-  SoundCloud: "☁️",
-  "Website/SEO": "🌐",
-  "Khác": "📦",
+  Instagram: "📸", Facebook: "👤", TikTok: "🎵", YouTube: "▶️",
+  "Twitter/X": "🐦", Telegram: "✈️", Spotify: "🎧", Discord: "💬",
+  LinkedIn: "💼", Snapchat: "👻", Pinterest: "📌", Twitch: "🎮",
+  Kick: "⚡", Threads: "🧵", SoundCloud: "☁️", "Website/SEO": "🌐", "Khác": "📦",
 };
 
-function formatNumber(n: number) {
+function formatNum(n: number) {
   return new Intl.NumberFormat("vi-VN").format(n);
+}
+
+function formatVND(usd: number, rate: number) {
+  const vnd = usd * rate;
+  if (vnd < 1000) return `${Math.ceil(vnd)}đ`;
+  return `${Math.ceil(vnd / 100) * 100 >= 1_000_000 ? (vnd / 1_000_000).toFixed(2) + "M" : (Math.ceil(vnd / 1000)).toLocaleString("vi-VN") + "k"}đ`;
 }
 
 export function NewOrderForm({ compact = false }: { compact?: boolean }) {
@@ -97,30 +68,32 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
   const { data: categoriesData, isLoading: catLoading } = useListCategories();
   const createOrderMut = useCreateOrder();
 
-  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState("");
+  const [selectedCatId, setSelectedCatId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [serviceId, setServiceId] = useState<number | null>(null);
+  const [link, setLink] = useState("");
+  const [quantity, setQuantity] = useState(100);
+  const linkRef = useRef<HTMLInputElement>(null);
 
-  const form = useForm<z.infer<typeof orderSchema>>({
-    resolver: zodResolver(orderSchema),
-    defaultValues: { categoryId: "", link: "", quantity: 100 },
+  const { data: publicSettings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: async () => { const r = await fetch(`${BASE}/api/public/settings`); return r.json(); },
+    staleTime: 5 * 60_000,
   });
+  const vndRate = Number(publicSettings?.vndExchangeRate || 24000);
 
-  const selectedCategoryId = form.watch("categoryId");
-  const selectedServiceId = form.watch("serviceId");
-  const quantity = form.watch("quantity");
-
-  // Compute platforms from categories
+  // Compute platforms
   const platforms = useMemo(() => {
     const cats = categoriesData?.categories || [];
-    const platformSet = new Set<string>();
-    cats.forEach(c => platformSet.add(detectPlatform(c.name)));
-    return Array.from(platformSet).sort((a, b) => {
-      const order = ["Instagram", "Facebook", "TikTok", "YouTube", "Twitter/X", "Telegram"];
-      const ai = order.indexOf(a);
-      const bi = order.indexOf(b);
+    const pSet = new Set<string>();
+    cats.forEach(c => pSet.add(detectPlatform(c.name)));
+    return Array.from(pSet).sort((a, b) => {
+      const order = ["Instagram", "Facebook", "TikTok", "YouTube", "Twitter/X", "Telegram", "Spotify", "Discord"];
+      const ai = order.indexOf(a), bi = order.indexOf(b);
       if (ai === -1 && bi === -1) return a.localeCompare(b);
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
+      if (ai === -1) return 1; if (bi === -1) return -1; return ai - bi;
     });
   }, [categoriesData]);
 
@@ -131,321 +104,313 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
     return cats.filter(c => detectPlatform(c.name) === selectedPlatform);
   }, [categoriesData, selectedPlatform]);
 
-  // Lazy load services only when category is selected
+  // Lazy load services for selected category
   const { data: servicesData, isLoading: srvLoading } = useQuery({
-    queryKey: ["services-by-category", selectedCategoryId],
+    queryKey: ["services-cat", selectedCatId],
     queryFn: async () => {
-      if (!selectedCategoryId) return { services: [] };
-      const res = await fetch(`${BASE}/api/services?categoryId=${selectedCategoryId}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Lỗi tải dịch vụ");
+      const res = await fetch(`${BASE}/api/services?categoryId=${selectedCatId}`, { credentials: "include" });
       return res.json();
     },
-    enabled: !!selectedCategoryId,
-    staleTime: 2 * 60 * 1000,
+    enabled: !!selectedCatId,
+    staleTime: 2 * 60_000,
   });
+  const services: any[] = servicesData?.services || [];
 
-  const filteredServices = servicesData?.services || [];
-
-  // Reset service when category changes
-  useEffect(() => {
-    form.setValue("serviceId", 0 as any);
-  }, [selectedCategoryId, form]);
-
-  // Auto-select first service
-  useEffect(() => {
-    if (filteredServices.length > 0 && (!selectedServiceId || selectedServiceId === 0)) {
-      form.setValue("serviceId", filteredServices[0].id);
-    }
-  }, [filteredServices]);
+  // Search across all services (search mode)
+  const { data: searchData, isLoading: searchLoading } = useQuery({
+    queryKey: ["services-search", searchQuery],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/services?search=${encodeURIComponent(searchQuery)}`, { credentials: "include" });
+      return res.json();
+    },
+    enabled: searchQuery.length >= 2,
+    staleTime: 60_000,
+  });
+  const searchResults: any[] = searchData?.services?.slice(0, 20) || [];
 
   const selectedService = useMemo(() => {
-    if (!selectedServiceId || selectedServiceId === 0) return null;
-    return filteredServices.find((s: any) => s.id === selectedServiceId) || null;
-  }, [filteredServices, selectedServiceId]);
+    if (!serviceId) return null;
+    return services.find((s: any) => s.id === serviceId) || null;
+  }, [services, serviceId]);
+
+  // Auto-select first service when category services load
+  useEffect(() => {
+    if (services.length > 0 && !serviceId) setServiceId(services[0].id);
+    if (services.length > 0) {
+      setQuantity(services[0].min || 100);
+    }
+  }, [services]);
+
+  // Reset service when category changes
+  useEffect(() => { setServiceId(null); }, [selectedCatId]);
+
+  // Reset category when platform changes
+  useEffect(() => { setSelectedCatId(""); setServiceId(null); }, [selectedPlatform]);
 
   const price = useMemo(() => {
     if (!selectedService || !quantity) return 0;
     return (quantity / 1000) * Number(selectedService.rate);
   }, [selectedService, quantity]);
 
-  const onSubmit = (values: z.infer<typeof orderSchema>) => {
-    if (selectedService && (values.quantity < selectedService.min || values.quantity > selectedService.max)) {
-      toast({ variant: "destructive", title: "Số lượng không hợp lệ", description: `Phải từ ${formatNumber(selectedService.min)} đến ${formatNumber(selectedService.max)}` });
+  const handleSearchSelect = (svc: any) => {
+    setServiceId(svc.id);
+    setSearchQuery(svc.name);
+    setShowSearchResults(false);
+    const cat = categoriesData?.categories?.find(c => c.id === svc.categoryId);
+    if (cat) {
+      setSelectedPlatform(detectPlatform(cat.name));
+      setSelectedCatId(cat.id.toString());
+    }
+    if (svc.min) setQuantity(svc.min);
+  };
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setLink(text);
+    } catch {
+      linkRef.current?.focus();
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!serviceId) { toast({ title: "Chọn dịch vụ", variant: "destructive" }); return; }
+    if (!link) { toast({ title: "Nhập link cần tăng", variant: "destructive" }); return; }
+    if (selectedService && (quantity < selectedService.min || quantity > selectedService.max)) {
+      toast({ variant: "destructive", title: "Số lượng không hợp lệ", description: `Phải từ ${formatNum(selectedService.min)} đến ${formatNum(selectedService.max)}` });
       return;
     }
     if (user && price > Number(user.balance)) {
       toast({ variant: "destructive", title: "Số dư không đủ", description: "Nạp thêm tiền để đặt hàng." });
       return;
     }
-    createOrderMut.mutate({ data: { serviceId: values.serviceId, link: values.link, quantity: values.quantity } }, {
+    createOrderMut.mutate({ data: { serviceId, link, quantity } }, {
       onSuccess: () => {
         toast({ title: "Đặt hàng thành công!", description: "Đơn hàng đang được xử lý." });
         setLocation("/orders");
       },
-      onError: (err: any) => {
-        toast({ variant: "destructive", title: "Đặt hàng thất bại", description: err.message });
-      },
+      onError: (err: any) => toast({ variant: "destructive", title: "Đặt hàng thất bại", description: err.message }),
     });
   };
 
   return (
-    <div className={cn("grid grid-cols-1 gap-6", compact ? "" : "lg:grid-cols-3")}>
-      <div className={compact ? "" : "lg:col-span-2 space-y-4"}>
-        {/* Platform Selector */}
-        {!catLoading && platforms.length > 0 && (
-          <Card className="border-border/50 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Chọn nền tảng</CardTitle>
-            </CardHeader>
-            <CardContent className="pb-4">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => { setSelectedPlatform(null); form.setValue("categoryId", ""); }}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                    !selectedPlatform
-                      ? "bg-primary text-primary-foreground shadow-md"
-                      : "bg-muted hover:bg-muted/80 text-foreground"
-                  )}
-                >
-                  🌐 <span>Tất cả</span>
-                </button>
-                {platforms.map(platform => (
-                  <button
-                    key={platform}
-                    onClick={() => {
-                      setSelectedPlatform(platform);
-                      form.setValue("categoryId", "");
-                    }}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                      selectedPlatform === platform
-                        ? `bg-gradient-to-r ${PLATFORM_COLORS[platform] || "from-gray-500 to-gray-600"} text-white shadow-md`
-                        : "bg-muted hover:bg-muted/80 text-foreground"
-                    )}
-                  >
-                    {PLATFORM_EMOJIS[platform] || "📦"} <span>{platform}</span>
-                  </button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Quick Search */}
+      <div className="space-y-1">
+        <Label className="text-sm font-medium">Tìm nhanh dịch vụ</Label>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            className="pl-9 bg-background"
+            placeholder="Nhập tên dịch vụ hoặc ID để tìm kiếm và tự động chọn"
+            value={searchQuery}
+            onChange={e => { setSearchQuery(e.target.value); setShowSearchResults(true); }}
+            onFocus={() => setShowSearchResults(true)}
+            onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
+          />
+          {searchLoading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />}
+        </div>
+        <p className="text-xs text-muted-foreground">Nhập tên hoặc ID dịch vụ để tìm kiếm nhanh và tự động chọn</p>
+        {showSearchResults && searchResults.length > 0 && (
+          <div className="absolute z-50 mt-1 w-full max-w-lg bg-background border border-border rounded-xl shadow-xl max-h-72 overflow-y-auto">
+            {searchResults.map((svc: any) => (
+              <button
+                key={svc.id} type="button"
+                className="w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors flex items-center gap-3 border-b border-border/30 last:border-0"
+                onMouseDown={() => handleSearchSelect(svc)}
+              >
+                <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded flex-shrink-0">#{svc.id}</span>
+                <span className="text-sm truncate flex-1">{svc.name}</span>
+                <span className="text-xs text-primary font-medium flex-shrink-0">${Number(svc.rate).toFixed(3)}/1K</span>
+              </button>
+            ))}
+          </div>
         )}
-
-        {/* Order Form */}
-        <Card className="shadow-md border-border/60">
-          <CardHeader className="bg-secondary/30 border-b border-border/50 rounded-t-2xl pb-4">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Zap className="h-5 w-5 text-primary" /> Chi tiết đơn hàng
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-5 md:p-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-
-                {/* Category */}
-                <FormField control={form.control} name="categoryId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-semibold">Danh mục</FormLabel>
-                    <Select
-                      onValueChange={(val) => { field.onChange(val); }}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="h-11 bg-background border-input">
-                          <SelectValue placeholder={catLoading ? "Đang tải..." : selectedPlatform ? `Chọn danh mục ${selectedPlatform}` : "Chọn danh mục"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="max-h-72">
-                        {filteredCategories.filter(c => c.active).map(cat => (
-                          <SelectItem key={cat.id} value={cat.id.toString()}>
-                            {cat.name}
-                            {(cat as any).serviceCount > 0 && (
-                              <span className="ml-2 text-xs text-muted-foreground">({(cat as any).serviceCount} dịch vụ)</span>
-                            )}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                {/* Service - lazy loaded */}
-                <FormField control={form.control} name="serviceId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-semibold">Dịch vụ</FormLabel>
-                    <Select
-                      disabled={!selectedCategoryId || srvLoading}
-                      onValueChange={(val) => field.onChange(parseInt(val))}
-                      value={field.value?.toString() || ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="h-11 bg-background border-input">
-                          {srvLoading ? (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              <span>Đang tải dịch vụ...</span>
-                            </div>
-                          ) : (
-                            <SelectValue placeholder={
-                              !selectedCategoryId ? "Chọn danh mục trước" :
-                              filteredServices.length === 0 ? "Không có dịch vụ" :
-                              "Chọn dịch vụ"
-                            } />
-                          )}
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="max-h-72">
-                        {filteredServices.map((srv: any) => (
-                          <SelectItem key={srv.id} value={srv.id.toString()}>
-                            <span className="font-mono text-xs text-muted-foreground mr-2">#{srv.id}</span>
-                            {srv.name}
-                            <span className="ml-2 text-xs text-primary font-medium">${Number(srv.rate).toFixed(3)}/1K</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                {/* Link */}
-                <FormField control={form.control} name="link" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="font-semibold">Link</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder={selectedService?.type === "Custom Comments" ? "Nhập nội dung..." : "https://..."}
-                          className="h-11 pl-9 bg-background"
-                          {...field}
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                {/* Quantity + Total */}
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="quantity" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="font-semibold">Số lượng</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input type="number" className="h-11 pl-9 bg-background font-mono" {...field} />
-                        </div>
-                      </FormControl>
-                      {selectedService && (
-                        <FormDescription className="text-xs">
-                          Min: {formatNumber(selectedService.min)} / Max: {formatNumber(selectedService.max)}
-                        </FormDescription>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <div className="flex flex-col justify-between pt-0.5">
-                    <label className="text-sm font-semibold text-foreground mb-1.5">Tổng tiền</label>
-                    <div className="h-11 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-bold text-xl font-display">
-                      ${price.toFixed(4)}
-                    </div>
-                    {selectedService && (
-                      <p className="text-xs text-muted-foreground mt-1">Rate: ${Number(selectedService.rate).toFixed(4)}/1K</p>
-                    )}
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  size="lg"
-                  className="w-full text-base shadow-md shadow-primary/20"
-                  disabled={createOrderMut.isPending || !selectedService || !quantity || !form.watch("link")}
-                >
-                  {createOrderMut.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Đang xử lý...</> : "Đặt hàng ngay"}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Service Details Panel */}
-      {!compact && (
-        <div>
-          <Card className="shadow-md border-border/60 sticky top-24">
-            <CardHeader className="bg-primary text-primary-foreground rounded-t-2xl pb-4">
-              <CardTitle className="flex items-center gap-2 text-white text-base">
-                <Info className="h-5 w-5" /> Chi tiết dịch vụ
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              {!selectedService ? (
-                <div className="p-8 text-center text-muted-foreground space-y-2">
-                  <Zap className="w-10 h-10 mx-auto opacity-20" />
-                  <p className="text-sm">Chọn dịch vụ để xem thông tin chi tiết</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-border/50">
-                  <div className="p-4 bg-secondary/20">
-                    <p className="text-xs font-semibold text-primary mb-1">ID #{selectedService.id}</p>
-                    <p className="text-foreground font-medium text-sm leading-snug">{selectedService.name}</p>
-                  </div>
-                  <div className="p-4 grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Giá/1000</p>
-                      <p className="font-bold text-lg text-foreground">${Number(selectedService.rate).toFixed(4)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Thời gian</p>
-                      <div className="flex items-center gap-1.5 text-foreground font-medium text-sm">
-                        <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                        <span className="truncate">{selectedService.averageTime || 'Không xác định'}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-4 grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase mb-1">Min</p>
-                      <p className="font-semibold">{formatNumber(selectedService.min)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase mb-1">Max</p>
-                      <p className="font-semibold">{formatNumber(selectedService.max)}</p>
-                    </div>
-                  </div>
-                  <div className="p-4 flex flex-wrap gap-2">
-                    <Badge variant={selectedService.refill ? "success" : "secondary"} className="text-xs py-1 px-2">
-                      <RefreshCw className="w-3 h-3 mr-1" />
-                      {selectedService.refill ? "Có Refill" : "Không Refill"}
-                    </Badge>
-                    <Badge variant={selectedService.cancel ? "outline" : "secondary"} className="text-xs py-1 px-2 border-muted-foreground/30">
-                      <XCircle className="w-3 h-3 mr-1 text-muted-foreground" />
-                      {selectedService.cancel ? "Hủy được" : "Không hủy"}
-                    </Badge>
-                  </div>
-                  {selectedService.description && (
-                    <div className="p-4 bg-muted/30">
-                      <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">{selectedService.description}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      {/* Platform select */}
+      <div className="space-y-1">
+        <Label className="text-sm font-medium">Nền tảng</Label>
+        <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
+          <SelectTrigger className="bg-background h-11">
+            <SelectValue placeholder="-- Chọn nền tảng --">
+              {selectedPlatform && `${PLATFORM_EMOJIS[selectedPlatform] || "📦"} ${selectedPlatform}`}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">🌐 Tất cả nền tảng</SelectItem>
+            {platforms.map(p => (
+              <SelectItem key={p} value={p}>
+                {PLATFORM_EMOJIS[p] || "📦"} {p}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-          {/* Lazy Load info badge */}
-          {selectedCategoryId && (
-            <div className="mt-3 p-3 rounded-xl bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
-              <p className="text-xs text-green-700 dark:text-green-400 font-medium">
-                ⚡ Lazy Load: Chỉ tải {filteredServices.length} dịch vụ của danh mục này. Tiết kiệm ~90% băng thông.
-              </p>
+      {/* Category select */}
+      <div className="space-y-1">
+        <Label className="text-sm font-medium">Phân loại</Label>
+        <Select
+          value={selectedCatId}
+          onValueChange={val => { setSelectedCatId(val); setServiceId(null); }}
+          disabled={catLoading}
+        >
+          <SelectTrigger className="bg-background h-11">
+            <SelectValue placeholder={catLoading ? "Đang tải..." : "-- Chọn phân loại --"}>
+              {selectedCatId && filteredCategories.find(c => c.id.toString() === selectedCatId) && (
+                <span className="flex items-center gap-2">
+                  <span>{PLATFORM_EMOJIS[detectPlatform(filteredCategories.find(c => c.id.toString() === selectedCatId)!.name)] || "📦"}</span>
+                  <span className="truncate">{filteredCategories.find(c => c.id.toString() === selectedCatId)?.name}</span>
+                </span>
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            {filteredCategories.filter(c => c.active).map(cat => (
+              <SelectItem key={cat.id} value={cat.id.toString()}>
+                <span className="flex items-center gap-2">
+                  <span>{PLATFORM_EMOJIS[detectPlatform(cat.name)] || "📦"}</span>
+                  <span>{cat.name}</span>
+                  {(cat as any).serviceCount > 0 && (
+                    <span className="text-xs text-muted-foreground">({(cat as any).serviceCount})</span>
+                  )}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Service select */}
+      <div className="space-y-1">
+        <Label className="text-sm font-medium">Dịch vụ</Label>
+        <Select
+          value={serviceId?.toString() || ""}
+          onValueChange={val => {
+            const id = parseInt(val);
+            setServiceId(id);
+            const svc = services.find((s: any) => s.id === id);
+            if (svc?.min) setQuantity(svc.min);
+          }}
+          disabled={!selectedCatId || srvLoading || services.length === 0}
+        >
+          <SelectTrigger className="bg-background h-11">
+            {srvLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" /><span>Đang tải dịch vụ...</span>
+              </div>
+            ) : (
+              <SelectValue placeholder={!selectedCatId ? "Chọn phân loại trước" : services.length === 0 ? "Không có dịch vụ" : "-- Chọn dịch vụ --"}>
+                {serviceId && selectedService && (
+                  <span className="flex items-center gap-2">
+                    <span className="font-mono text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded flex-shrink-0">#{selectedService.id}</span>
+                    <span className="truncate">{selectedService.name}</span>
+                  </span>
+                )}
+              </SelectValue>
+            )}
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            {services.map((svc: any) => (
+              <SelectItem key={svc.id} value={svc.id.toString()}>
+                <span className="flex items-center gap-2 w-full">
+                  <span className="font-mono text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded flex-shrink-0">#{svc.id}</span>
+                  <span className="flex-1 truncate">{svc.name}</span>
+                  <span className="text-xs text-primary font-medium flex-shrink-0">${Number(svc.rate).toFixed(3)}/1K</span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Link */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-medium">Liên kết cần tăng</Label>
+          <button type="button" onClick={() => setLocation("/mass-order")} className="text-xs text-primary hover:underline">Bạn muốn mua 1 lần nhiều link?</button>
+        </div>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              ref={linkRef}
+              className="pl-9 bg-background h-11"
+              placeholder="Nhập liên kết cần tăng tương tác..."
+              value={link}
+              onChange={e => setLink(e.target.value)}
+            />
+          </div>
+          <Button type="button" variant="outline" className="h-11 px-4 gap-1.5 flex-shrink-0" onClick={handlePaste}>
+            <Clipboard className="w-4 h-4" /> Dán
+          </Button>
+        </div>
+      </div>
+
+      {/* Quantity */}
+      <div className="space-y-1">
+        <Label className="text-sm font-medium">Số lượng</Label>
+        <Input
+          type="number"
+          className="bg-background h-11"
+          value={quantity}
+          onChange={e => setQuantity(Number(e.target.value))}
+          min={selectedService?.min || 1}
+          max={selectedService?.max}
+        />
+        {selectedService && (
+          <p className="text-xs text-muted-foreground">
+            Tối thiểu: {formatNum(selectedService.min)} — Tối đa: {formatNum(selectedService.max)}
+          </p>
+        )}
+      </div>
+
+      {/* Total */}
+      {selectedService && (
+        <div className="rounded-xl border border-border/50 bg-muted/30 p-4">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-foreground">Tổng tiền cần thanh toán:</span>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-primary font-display">{formatVND(price, vndRate)}</p>
+              <p className="text-xs text-muted-foreground">(${price.toFixed(4)})</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Service Details (compact) */}
+      {selectedService && (
+        <div className="rounded-xl border border-border/40 bg-secondary/20 p-3 space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <Badge variant={selectedService.refill ? "success" : "secondary"} className="text-xs gap-1">
+              <RefreshCw className="w-3 h-3" />{selectedService.refill ? "Có Refill" : "Không Refill"}
+            </Badge>
+            <Badge variant="outline" className="text-xs gap-1 border-muted-foreground/30">
+              <XCircle className="w-3 h-3 text-muted-foreground" />{selectedService.cancel ? "Hủy được" : "Không hủy"}
+            </Badge>
+            {selectedService.averageTime && (
+              <Badge variant="outline" className="text-xs gap-1 border-muted-foreground/30">
+                <Clock className="w-3 h-3 text-muted-foreground" />{selectedService.averageTime}
+              </Badge>
+            )}
+          </div>
+          {selectedService.description && (
+            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{selectedService.description}</p>
           )}
         </div>
       )}
-    </div>
+
+      {/* Submit */}
+      <Button
+        type="submit"
+        size="lg"
+        className="w-full h-12 text-base font-semibold shadow-md shadow-primary/20"
+        disabled={createOrderMut.isPending || !serviceId || !link}
+      >
+        {createOrderMut.isPending ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Đang xử lý...</> : "Đặt hàng"}
+      </Button>
+    </form>
   );
 }

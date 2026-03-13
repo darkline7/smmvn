@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 type SidebarItem = {
   title: string;
@@ -47,6 +48,14 @@ const adminNav: SidebarItem[] = [
   { title: "Cài đặt", href: "/admin/settings", icon: Settings },
 ];
 
+const mobileBottomNav = [
+  { title: "Trang chủ", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Nạp tiền", href: "/add-funds", icon: Wallet },
+  { title: "Tạo đơn hàng", href: "/new-order", icon: ShoppingCart, center: true },
+  { title: "Đơn hàng", href: "/orders", icon: ListOrdered },
+  { title: "Tài khoản", href: "/profile", icon: User },
+];
+
 export function DashboardLayout({ children, isAdminLayout = false }: { children: React.ReactNode, isAdminLayout?: boolean }) {
   const [location, setLocation] = useLocation();
   const { data: user, isLoading } = useGetMe();
@@ -54,7 +63,6 @@ export function DashboardLayout({ children, isAdminLayout = false }: { children:
   const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Auth protection
   React.useEffect(() => {
     if (!isLoading && !user) {
       setLocation("/login");
@@ -66,8 +74,8 @@ export function DashboardLayout({ children, isAdminLayout = false }: { children:
   const handleLogout = () => {
     logoutMut.mutate(undefined, {
       onSuccess: () => {
-        toast({ title: "Logged out successfully" });
-        window.location.href = "/login"; // Hard redirect to clear query cache
+        toast({ title: "Đã đăng xuất thành công" });
+        window.location.href = "/login";
       }
     });
   };
@@ -84,8 +92,13 @@ export function DashboardLayout({ children, isAdminLayout = false }: { children:
         const isActive = location === item.href || (item.href !== "/dashboard" && item.href !== "/admin" && location.startsWith(item.href));
         return (
           <Link key={item.href} href={item.href}>
-            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer ${isActive ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 font-medium' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}>
-              <item.icon className="h-5 w-5" />
+            <div className={cn(
+              "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer",
+              isActive
+                ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 font-medium"
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+            )}>
+              <item.icon className="h-5 w-5 flex-shrink-0" />
               <span>{item.title}</span>
             </div>
           </Link>
@@ -109,12 +122,11 @@ export function DashboardLayout({ children, isAdminLayout = false }: { children:
         
         <div className="flex-1 overflow-y-auto py-6 px-4 space-y-1 scrollbar-hide">
           <div className="mb-6 px-4 py-3 bg-secondary/50 rounded-xl border border-border/50">
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1">Balance</p>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-1">Số dư</p>
             <p className="text-2xl font-bold text-foreground font-display">{formatCurrency(user.balance, user.currency)}</p>
           </div>
-          
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2 mt-4">
-            {isAdminLayout ? 'Administration' : 'Menu'}
+            {isAdminLayout ? 'Quản trị' : 'Menu'}
           </p>
           <NavLinks />
         </div>
@@ -130,13 +142,12 @@ export function DashboardLayout({ children, isAdminLayout = false }: { children:
           {isAdminLayout && (
             <Link href="/dashboard">
               <Button variant="outline" className="w-full justify-start mb-2">
-                <User className="mr-2 h-4 w-4" /> Back to App
+                <User className="mr-2 h-4 w-4" /> Về trang người dùng
               </Button>
             </Link>
           )}
-          
           <div className="flex items-center gap-3 mb-4 px-2">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold flex-shrink-0">
               {user.username.charAt(0).toUpperCase()}
             </div>
             <div className="overflow-hidden">
@@ -144,9 +155,8 @@ export function DashboardLayout({ children, isAdminLayout = false }: { children:
               <p className="text-xs text-muted-foreground truncate">{user.email}</p>
             </div>
           </div>
-          
           <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" /> Log out
+            <LogOut className="mr-2 h-4 w-4" /> Đăng xuất
           </Button>
         </div>
       </aside>
@@ -154,26 +164,26 @@ export function DashboardLayout({ children, isAdminLayout = false }: { children:
       {/* Main Content Area */}
       <div className="flex flex-col flex-1 w-full overflow-hidden">
         {/* Mobile Header */}
-        <header className="md:hidden flex items-center justify-between p-4 bg-card border-b border-border z-20">
+        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-card border-b border-border z-20">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold">S</div>
-            <span className="font-display font-bold text-lg">SMM Pro</span>
+            <span className="font-display font-bold text-base">SMM Pro</span>
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-xs text-muted-foreground">Balance</p>
-              <p className="font-bold text-sm text-primary">{formatCurrency(user.balance, user.currency)}</p>
+              <p className="text-[10px] text-muted-foreground leading-none">Số dư</p>
+              <p className="font-bold text-sm text-primary leading-tight">{formatCurrency(user.balance, user.currency)}</p>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(true)}>
-              <Menu className="h-6 w-6" />
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMobileMenuOpen(true)}>
+              <Menu className="h-5 w-5" />
             </Button>
           </div>
         </header>
 
-        {/* Top bar for desktop */}
+        {/* Desktop topbar */}
         <header className="hidden md:flex h-16 items-center justify-between px-8 bg-background border-b border-border/50 shrink-0">
           <h1 className="text-xl font-display font-semibold text-foreground capitalize">
-            {location.split('/')[location.split('/').length - 1] || 'Dashboard'}
+            {location.split('/').filter(Boolean).pop() === 'dashboard' ? 'Dashboard' : location.split('/').filter(Boolean).pop() || 'Dashboard'}
           </h1>
           <div className="flex items-center gap-4">
             <Link href="/notifications">
@@ -194,14 +204,46 @@ export function DashboardLayout({ children, isAdminLayout = false }: { children:
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-background p-4 md:p-8 relative">
-          {/* Subtle background pattern */}
-          <div className="absolute inset-0 pointer-events-none opacity-[0.02]" style={{ backgroundImage: `url(${import.meta.env.BASE_URL}images/dashboard-pattern.png)`, backgroundSize: '100px' }} />
-          <div className="relative z-10 max-w-7xl mx-auto h-full">
+        <main className="flex-1 overflow-y-auto bg-background p-4 md:p-8 pb-24 md:pb-8 relative">
+          <div className="relative z-10 max-w-7xl mx-auto">
             {children}
           </div>
         </main>
       </div>
+
+      {/* ── Mobile Bottom Navigation ── */}
+      {!isAdminLayout && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border/60 safe-area-bottom shadow-xl">
+          <div className="flex items-stretch h-16">
+            {mobileBottomNav.map((item) => {
+              const isActive = location === item.href || (item.href !== "/dashboard" && location.startsWith(item.href));
+              if (item.center) {
+                return (
+                  <Link key={item.href} href={item.href} className="flex-1 flex items-center justify-center">
+                    <div className={cn(
+                      "w-14 h-14 -mt-5 rounded-full flex flex-col items-center justify-center shadow-lg shadow-primary/30 transition-transform active:scale-95",
+                      "bg-gradient-to-br from-primary to-accent text-primary-foreground"
+                    )}>
+                      <item.icon className="w-6 h-6" />
+                    </div>
+                  </Link>
+                );
+              }
+              return (
+                <Link key={item.href} href={item.href} className="flex-1">
+                  <div className={cn(
+                    "h-full flex flex-col items-center justify-center gap-1 transition-colors",
+                    isActive ? "text-primary" : "text-muted-foreground"
+                  )}>
+                    <item.icon className={cn("w-5 h-5", isActive && "drop-shadow-sm")} />
+                    <span className="text-[10px] font-medium leading-none">{item.title}</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      )}
 
       {/* Mobile Menu Drawer */}
       {mobileMenuOpen && (
@@ -228,12 +270,12 @@ export function DashboardLayout({ children, isAdminLayout = false }: { children:
               {isAdminLayout && (
                 <Link href="/dashboard">
                   <Button variant="outline" className="w-full justify-start mb-2" onClick={() => setMobileMenuOpen(false)}>
-                    <User className="mr-2 h-4 w-4" /> Back to App
+                    <User className="mr-2 h-4 w-4" /> Về trang người dùng
                   </Button>
                 </Link>
               )}
               <Button variant="destructive" className="w-full justify-start" onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" /> Log out
+                <LogOut className="mr-2 h-4 w-4" /> Đăng xuất
               </Button>
             </div>
           </div>

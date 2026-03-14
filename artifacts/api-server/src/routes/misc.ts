@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { announcementsTable, notificationsTable, referralsTable, usersTable, siteSettingsTable, providersTable, servicesTable, categoriesTable, ordersTable, orderLogsTable } from "@workspace/db/schema";
 import { eq, desc, sql, and, inArray, isNotNull } from "drizzle-orm";
-import { requireAuth } from "../lib/auth.js";
+import { requireAuth, requireAdmin } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
 
 const router = Router();
@@ -49,8 +49,8 @@ router.get("/public/settings", async (_req, res) => {
   }
 });
 
-// DB status check (authenticated)
-router.get("/admin/db-status", requireAuth as any, async (_req: AuthRequest, res: any) => {
+// DB status check (admin only)
+router.get("/admin/db-status", requireAdmin as any, async (_req: AuthRequest, res: any) => {
   try {
     const start = Date.now();
     await db.execute(sql`SELECT 1`);

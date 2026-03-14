@@ -4,7 +4,9 @@ import { usersTable, siteSettingsTable } from "@workspace/db/schema";
 import { eq, or } from "drizzle-orm";
 import { hashPassword, generateApiKey, generateReferralCode } from "../lib/auth.js";
 import { setSession, getSession } from "../app.js";
+import { authRateLimit } from "../lib/rate-limits.js";
 import { z } from "zod";
+import crypto from "crypto";
 
 const router = Router();
 
@@ -45,7 +47,7 @@ const loginSchema = z.object({
   turnstileToken: z.string().optional(),
 });
 
-router.post("/register", async (req: Request, res: Response) => {
+router.post("/register", authRateLimit, async (req: Request, res: Response) => {
   try {
     const data = registerSchema.parse(req.body);
     const settings = await loadSettings();
@@ -87,7 +89,7 @@ router.post("/register", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/login", async (req: Request, res: Response) => {
+router.post("/login", authRateLimit, async (req: Request, res: Response) => {
   try {
     const data = loginSchema.parse(req.body);
     const settings = await loadSettings();
@@ -145,7 +147,10 @@ router.get("/google", async (req: Request, res: Response) => {
   const siteUrl = settings["site_url"] || `${req.protocol}://${req.get("host")}`;
   const redirectUri = `${siteUrl}/api/auth/google/callback`;
   const scope = encodeURIComponent("openid email profile");
-  const state = Buffer.from(JSON.stringify({ ts: Date.now() })).toString("base64url");
+  const stateNonce = crypto.randomBytes(16).toString("hex");
+  const state = Buffer.from(JSON.stringify({ ts: Date.now(), nonce: stateNonce })).toString("base64url");
+  // Store nonce in httpOnly cookie for 10 minutes
+  res.cookie("oauth_state", stateNonce, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 10 * 60 * 1000 });
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&state=${state}&access_type=offline`;
   return res.redirect(url);
 });
@@ -159,8 +164,20 @@ router.get("/google/callback", async (req: Request, res: Response) => {
     const redirectUri = `${siteUrl}/api/auth/google/callback`;
     const frontendUrl = siteUrl;
 
-    const { code, error } = req.query;
+    const { code, error, state: stateParam } = req.query;
     if (error || !code) return res.redirect(`${frontendUrl}/login?error=google_denied`);
+
+    // Verify state nonce to prevent CSRF
+    try {
+      if (stateParam) {
+        const decoded = JSON.parse(Buffer.from(String(stateParam), "base64url").toString());
+        const cookieNonce = req.cookies?.oauth_state;
+        if (!cookieNonce || !decoded.nonce || decoded.nonce !== cookieNonce) {
+          return res.redirect(`${frontendUrl}/login?error=oauth_state_mismatch`);
+        }
+        res.clearCookie("oauth_state", { httpOnly: true, sameSite: "lax", path: "/" });
+      }
+    } catch { /* invalid state — continue */ }
 
     // Exchange code for tokens
     const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
@@ -226,9 +243,13 @@ router.post("/forgot-password", async (_req: Request, res: Response) => {
   return res.json({ success: true, message: "If that email exists, a reset link will be sent" });
 });
 
-router.post("/make-admin", async (req: Request, res: Response) => {
+router.post("/make-admin", authRateLimit, async (req: Request, res: Response) => {
   const { email, setupKey } = req.body;
-  const expectedKey = process.env.SETUP_KEY || "smmsetup2024";
+  const expectedKey = process.env.SETUP_KEY;
+  // Endpoint disabled if SETUP_KEY is not set in environment
+  if (!expectedKey) {
+    return res.status(404).json({ error: "Not found" });
+  }
   if (!setupKey || setupKey !== expectedKey) {
     return res.status(403).json({ error: "Invalid setup key" });
   }

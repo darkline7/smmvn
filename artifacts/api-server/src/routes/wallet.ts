@@ -194,53 +194,90 @@ router.post("/cards", requireAuth as any, async (req: AuthRequest, res: any) => 
   }
 });
 
-// ── Callback endpoint for gachthevip.vn (POST after card processed) ──────────
+// ── Callback endpoint for thesieure.com (POST after card processed) ──────────
 router.post("/cards/callback", async (req: any, res: any) => {
   try {
-    const { request_id, status, amount, declared_value, message } = req.body;
+    const { request_id, status, amount, declared_value, message, sign } = req.body;
     if (!request_id) return res.status(400).json({ error: "Missing request_id" });
 
-    const [charge] = await db.select().from(cardChargesTable).where(eq(cardChargesTable.requestId, request_id)).limit(1);
+    // Verify HMAC signature from thesieure.com
+    // sign = md5(partner_id + partner_key + request_id)
+    const settingsForAuth = await db.select().from(siteSettingsTable)
+      .where(sql`key IN ('card_partner_id', 'card_partner_key')`);
+    const sMap: Record<string, string> = {};
+    for (const s of settingsForAuth) sMap[s.key] = s.value || "";
+    const partnerId = sMap["card_partner_id"];
+    const partnerKey = sMap["card_partner_key"];
+
+    if (partnerId && partnerKey) {
+      if (!sign) {
+        return res.status(401).json({ error: "Missing signature" });
+      }
+      const expectedSign = crypto.createHash("md5")
+        .update(partnerId + partnerKey + request_id)
+        .digest("hex");
+      if (sign !== expectedSign) {
+        return res.status(401).json({ error: "Invalid signature" });
+      }
+    }
+
+    const [charge] = await db.select().from(cardChargesTable)
+      .where(eq(cardChargesTable.requestId, request_id)).limit(1);
     if (!charge) return res.status(404).json({ error: "Charge not found" });
 
-    // Already finalized? skip
-    if (charge.status === 1 || charge.status === 3) return res.json({ success: true, message: "Already processed" });
+    // Already finalized? skip (idempotent)
+    if (charge.status === 1 || charge.status === 3) {
+      return res.json({ success: true, message: "Already processed" });
+    }
 
     const cardStatus = Number(status) || 3;
     const actualAmount = amount ? Number(amount) : null;
 
     let usdCredited: string | null = null;
     if (cardStatus === 1 && actualAmount) {
-      const settings = await db.select().from(siteSettingsTable).where(sql`key = 'vnd_exchange_rate'`).limit(1);
-      const vndRate = Number(settings[0]?.value || "24000");
+      const rateSetting = await db.select({ value: siteSettingsTable.value })
+        .from(siteSettingsTable).where(sql`key = 'vnd_exchange_rate'`).limit(1);
+      const vndRate = Number(rateSetting[0]?.value || "24000");
       const usd = actualAmount / vndRate;
-      const user = await db.select({ balance: usersTable.balance }).from(usersTable).where(eq(usersTable.id, charge.userId)).limit(1);
-      const newBalance = Number(user[0]?.balance || 0) + usd;
       usdCredited = usd.toFixed(4);
-      await Promise.all([
-        db.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, charge.userId)),
-        db.insert(transactionsTable).values({
+
+      // Use DB transaction to prevent race conditions
+      await db.transaction(async (tx) => {
+        const [user] = await tx.select({ balance: usersTable.balance })
+          .from(usersTable).where(eq(usersTable.id, charge.userId)).limit(1);
+        const newBalance = Number(user?.balance || 0) + usd;
+        await tx.update(usersTable)
+          .set({ balance: newBalance.toFixed(4) })
+          .where(eq(usersTable.id, charge.userId));
+        await tx.insert(transactionsTable).values({
           userId: charge.userId,
           type: "deposit",
           amount: usd.toFixed(4),
           balanceAfter: newBalance.toFixed(4),
           description: `Nạp thẻ ${charge.telco} ${Number(charge.declaredAmount).toLocaleString("vi-VN")}đ (callback)`,
           referenceId: charge.id,
-        }),
-      ]);
+        });
+        await tx.update(cardChargesTable).set({
+          status: cardStatus,
+          message: message || null,
+          actualAmount: actualAmount ? String(actualAmount) : null,
+          usdCredited,
+          updatedAt: new Date(),
+        }).where(eq(cardChargesTable.id, charge.id));
+      });
+    } else {
+      await db.update(cardChargesTable).set({
+        status: cardStatus,
+        message: message || null,
+        actualAmount: actualAmount ? String(actualAmount) : null,
+        usdCredited: null,
+        updatedAt: new Date(),
+      }).where(eq(cardChargesTable.id, charge.id));
     }
 
-    await db.update(cardChargesTable).set({
-      status: cardStatus,
-      message: message || null,
-      actualAmount: actualAmount ? String(actualAmount) : null,
-      usdCredited,
-      updatedAt: new Date(),
-    }).where(eq(cardChargesTable.id, charge.id));
-
     return res.json({ success: true });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+  } catch {
+    return res.status(500).json({ error: "Internal error" });
   }
 });
 

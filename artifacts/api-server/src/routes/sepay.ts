@@ -18,11 +18,14 @@ router.post("/sepay", async (req: any, res: any) => {
     const settings = await getSettings();
     const webhookSecret = process.env.SEPAY_WEBHOOK_SECRET || settings["sepay_webhook_secret"] || "";
 
-    if (webhookSecret) {
-      const apiKey = req.headers["authorization"] || req.body.apikey || "";
-      if (apiKey !== webhookSecret && apiKey !== `Apikey ${webhookSecret}`) {
-        return res.status(401).json({ success: false, message: "Unauthorized" });
-      }
+    // Always require webhook secret — never allow unauthenticated webhooks
+    if (!webhookSecret) {
+      console.warn("[SePay] Webhook received but SEPAY_WEBHOOK_SECRET not configured — rejecting");
+      return res.status(401).json({ success: false, message: "Webhook secret not configured" });
+    }
+    const apiKey = req.headers["authorization"] || req.body.apikey || "";
+    if (apiKey !== webhookSecret && apiKey !== `Apikey ${webhookSecret}`) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
     const { transferType, content, transferAmount, amount, in: inAmount } = req.body;

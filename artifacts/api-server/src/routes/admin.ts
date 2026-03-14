@@ -514,8 +514,10 @@ router.get("/tickets/:id", async (req: AuthRequest, res: any) => {
 });
 
 router.patch("/tickets/:id/status", async (req: AuthRequest, res: any) => {
+  const VALID_TICKET_STATUSES = ["open", "pending", "in_progress", "resolved", "closed"] as const;
   const { status } = req.body;
   if (!status) return res.status(400).json({ error: "status required" });
+  if (!VALID_TICKET_STATUSES.includes(status)) return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_TICKET_STATUSES.join(", ")}` });
   await db.update(ticketsTable).set({ status, updatedAt: new Date() }).where(eq(ticketsTable.id, Number(req.params.id)));
   return res.json({ success: true, message: "Ticket updated" });
 });
@@ -593,12 +595,37 @@ router.get("/settings", async (req: AuthRequest, res: any) => {
   return res.json(result);
 });
 
+const ALLOWED_SETTING_KEYS = new Set([
+  "site_name", "site_url", "logo_url", "favicon_url",
+  "site_description", "support_email", "support_url",
+  "bank_account_name", "bank_account_number", "bank_name", "bank_branch",
+  "min_deposit", "max_deposit", "min_order_amount",
+  "vnd_exchange_rate", "referral_commission", "referral_bonus",
+  "telegram_bot_token", "telegram_admin_chat_id",
+  "card_partner_id", "card_partner_key",
+  "sepay_webhook_secret", "sepay_account_number",
+  "google_client_id", "google_client_secret",
+  "smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from",
+  "turnstile_site_key", "turnstile_secret_key",
+  "maintenance_mode", "registration_enabled", "maintenance_message",
+  "cron_secret", "order_processing_fee",
+]);
+
 router.patch("/settings", async (req: AuthRequest, res: any) => {
   const entries = Object.entries(req.body);
+  const rejected: string[] = [];
   for (const [key, value] of entries) {
-    await db.insert(siteSettingsTable).values({ key, value: String(value) }).onConflictDoUpdate({ target: siteSettingsTable.key, set: { value: String(value), updatedAt: new Date() } });
+    if (!ALLOWED_SETTING_KEYS.has(key)) {
+      rejected.push(key);
+      continue;
+    }
+    await db.insert(siteSettingsTable).values({ key, value: String(value) })
+      .onConflictDoUpdate({ target: siteSettingsTable.key, set: { value: String(value), updatedAt: new Date() } });
   }
-  return res.json(req.body);
+  if (rejected.length > 0) {
+    console.warn("[Admin Settings] Blocked attempt to set unknown keys:", rejected);
+  }
+  return res.json({ success: true, rejected: rejected.length > 0 ? rejected : undefined });
 });
 
 // Aliases for admin payments page URL format
@@ -629,8 +656,10 @@ router.post("/deposits/:id/rejected", async (req: AuthRequest, res: any) => {
 
 // Alias for orders status update
 router.patch("/orders/:id/status", async (req: AuthRequest, res: any) => {
+  const VALID_STATUSES = ["pending", "processing", "in_progress", "completed", "partial", "cancelled", "refunded", "failed"] as const;
   const { status } = req.body;
   if (!status) return res.status(400).json({ error: "status required" });
+  if (!VALID_STATUSES.includes(status)) return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
   const updated = await db.update(ordersTable).set({ status, updatedAt: new Date() }).where(eq(ordersTable.id, Number(req.params.id))).returning();
   if (!updated[0]) return res.status(404).json({ error: "Not found" });
   await db.insert(orderLogsTable).values({ orderId: Number(req.params.id), status, note: `Status changed to ${status} by admin` });

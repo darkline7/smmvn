@@ -42,3 +42,9 @@ id = "khg0F0yyPYOyluXova7vv"
 uri = "file://HUONG_DAN_DEPLOY_CPANEL_NODEJS.md"
 type = "text"
 title = "Hướng dẫn Deploy cPanel Node.js (11 bước chi tiết)"
+
+[[outputs]]
+id = "8zZYAujCOwLRKp_FunB30"
+uri = "file://smm-panel-cpanel-php.tar.gz"
+type = "unspecified"
+title = "SMM Panel Pro — PHP cPanel Package (1.9MB)"

@@ -272,27 +272,35 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
         </Select>
       </div>
 
-      {/* 3. Category */}
-      <div className="space-y-1">
-        <Label className="text-sm font-medium">Phân loại</Label>
-        <Select
-          value={catId}
-          onValueChange={val => { setCatId(val); setServiceId(null); }}
-          disabled={catLoading || filteredCats.length === 0}
-        >
-          <SelectTrigger className="bg-background h-11">
-            <SelectValue placeholder={catLoading ? "Đang tải..." : "-- Chọn phân loại --"} />
-          </SelectTrigger>
-          <SelectContent className="max-h-72">
-            {filteredCats.map((cat: any) => (
-              <SelectItem key={cat.id} value={cat.id.toString()}>
-                {PLATFORM_EMOJI[detectPlatform(cat.name)] || "📦"} {cat.name}
-                {cat.serviceCount > 0 ? ` (${cat.serviceCount})` : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {/* 3. Category — horizontal chip list */}
+      {filteredCats.length > 0 && (
+        <div className="space-y-1">
+          <Label className="text-sm font-medium">Phân loại</Label>
+          {catLoading ? (
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {[1,2,3].map(i => <div key={i} className="h-7 w-24 bg-muted animate-pulse rounded-full flex-shrink-0" />)}
+            </div>
+          ) : (
+            <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-0.5 px-0.5 scrollbar-none">
+              {filteredCats.map((cat: any) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => { setCatId(catId === cat.id.toString() ? "" : cat.id.toString()); setServiceId(null); }}
+                  className={`flex-shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-all whitespace-nowrap ${
+                    catId === cat.id.toString()
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "border-border hover:border-primary/60 hover:bg-muted/60 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {cat.icon || PLATFORM_EMOJI[detectPlatform(cat.name)] || "📦"} {cat.name}
+                  {cat.serviceCount > 0 && <span className="ml-1 opacity-60">({cat.serviceCount})</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 4. Service — scrollable list */}
       <div className="space-y-1">

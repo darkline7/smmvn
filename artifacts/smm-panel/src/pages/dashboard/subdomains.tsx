@@ -81,16 +81,55 @@ export default function SubdomainsPage() {
           </Button>
         </div>
 
-        {/* How it works */}
+        {/* How it works + DNS guide */}
         <Card className="border-border/50 bg-muted/30">
-          <CardContent className="p-5 space-y-3">
-            <h3 className="font-semibold flex items-center gap-2"><Server className="w-4 h-4 text-primary" /> Cách hoạt động</h3>
+          <CardContent className="p-5 space-y-4">
+            <h3 className="font-semibold flex items-center gap-2"><Server className="w-4 h-4 text-primary" /> Cách thiết lập</h3>
             <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
-              <li>Nhập tên miền bạn muốn sử dụng (VD: smm.yourdomain.com)</li>
-              <li>Trỏ bản ghi <strong className="text-foreground">CNAME</strong> hoặc <strong className="text-foreground">A</strong> về địa chỉ máy chủ của chúng tôi</li>
-              <li>Gửi yêu cầu — admin sẽ duyệt và kích hoạt trong vài giờ</li>
-              <li>Khách hàng truy cập domain của bạn sẽ thấy bảng giá dịch vụ với thương hiệu riêng</li>
+              <li>Đăng nhập vào nhà cung cấp tên miền (Namecheap, Cloudflare, GoDaddy…)</li>
+              <li>Vào phần quản lý <strong className="text-foreground">DNS Records</strong></li>
+              <li>Thêm bản ghi <strong className="text-foreground">CNAME</strong> trỏ về địa chỉ máy chủ bên dưới</li>
+              <li>Nhấn <strong className="text-foreground">Thêm domain</strong> và điền tên miền của bạn</li>
+              <li>Chờ admin duyệt (thường trong 1–2 giờ) — DNS mất 24–48h để lan truyền</li>
             </ol>
+
+            <div className="rounded-lg border bg-background p-3 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bản ghi DNS cần thêm</p>
+              <div className="overflow-x-auto">
+                <table className="text-xs w-full">
+                  <thead>
+                    <tr className="text-muted-foreground border-b">
+                      <th className="text-left py-1 pr-4 font-medium">Type</th>
+                      <th className="text-left py-1 pr-4 font-medium">Host / Name</th>
+                      <th className="text-left py-1 font-medium">Value / Points to</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    <tr>
+                      <td className="py-1.5 pr-4 font-mono font-bold text-primary">CNAME</td>
+                      <td className="py-1.5 pr-4 font-mono">smm (hoặc @)</td>
+                      <td className="py-1.5 font-mono">smmvn.replit.app</td>
+                    </tr>
+                    <tr className="text-muted-foreground">
+                      <td className="py-1.5 pr-4 font-mono">CNAME</td>
+                      <td className="py-1.5 pr-4 font-mono">* (wildcard)</td>
+                      <td className="py-1.5 font-mono">smmvn.replit.app</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-xs text-muted-foreground flex-1">
+                  Dùng <strong>wildcard CNAME (*)</strong> nếu muốn tất cả subdomain đều trỏ về hệ thống.
+                </p>
+                <button
+                  className="text-xs text-primary hover:underline flex items-center gap-1 shrink-0"
+                  onClick={() => { navigator.clipboard.writeText("smmvn.replit.app"); toast({ title: "Đã sao chép địa chỉ máy chủ!" }); }}
+                >
+                  <Copy className="w-3 h-3" /> Sao chép
+                </button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

@@ -236,6 +236,19 @@ router.post("/categories", async (req: AuthRequest, res: any) => {
   }
 });
 
+// Batch reorder categories
+router.post("/categories/reorder", async (req: AuthRequest, res: any) => {
+  try {
+    const orders: { id: number; sortOrder: number }[] = req.body.orders || [];
+    await Promise.all(orders.map(({ id, sortOrder }) =>
+      db.update(categoriesTable).set({ sortOrder, updatedAt: new Date() }).where(eq(categoriesTable.id, id))
+    ));
+    return res.json({ ok: true });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 router.patch("/categories/:id", async (req: AuthRequest, res: any) => {
   const updated = await db.update(categoriesTable).set({ ...req.body, updatedAt: new Date() }).where(eq(categoriesTable.id, Number(req.params.id))).returning();
   if (!updated[0]) return res.status(404).json({ error: "Not found" });

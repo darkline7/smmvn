@@ -71,6 +71,22 @@ const cardSchema = z.object({
   amount: z.number().refine(v => (CARD_AMOUNTS as readonly number[]).includes(v), { message: "Mệnh giá không hợp lệ" }),
 });
 
+// Cancel a pending deposit
+router.post("/deposits/:id/cancel", requireAuth as any, async (req: AuthRequest, res: any) => {
+  try {
+    const id = Number(req.params.id);
+    const [dep] = await db.select().from(depositsTable)
+      .where(and(eq(depositsTable.id, id), eq(depositsTable.userId, req.userId!)))
+      .limit(1);
+    if (!dep) return res.status(404).json({ error: "Không tìm thấy lệnh nạp" });
+    if (dep.status !== "pending") return res.status(400).json({ error: "Chỉ có thể hủy lệnh đang chờ" });
+    await db.update(depositsTable).set({ status: "rejected", note: "Người dùng hủy lệnh" }).where(eq(depositsTable.id, id));
+    return res.json({ ok: true });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 router.get("/cards", requireAuth as any, async (req: AuthRequest, res: any) => {
   const charges = await db.select().from(cardChargesTable)
     .where(eq(cardChargesTable.userId, req.userId!))
@@ -85,13 +101,13 @@ router.post("/cards", requireAuth as any, async (req: AuthRequest, res: any) => 
 
     // Get partner credentials from site settings
     const settings = await db.select().from(siteSettingsTable)
-      .where(sql`key IN ('card_partner_id', 'card_partner_key', 'vnd_exchange_rate', 'card_api_url')`);
+      .where(sql`key IN ('card_partner_id', 'card_partner_key', 'vnd_exchange_rate')`);
     const settingsMap: Record<string, string> = {};
     for (const s of settings) settingsMap[s.key] = s.value || "";
 
     const partnerId = settingsMap["card_partner_id"];
     const partnerKey = settingsMap["card_partner_key"];
-    const cardApiUrl = settingsMap["card_api_url"] || "https://thesieure.com/chargingws/v2";
+    const cardApiUrl = "https://thesieure.com/chargingws/v2";
     if (!partnerId || !partnerKey) {
       return res.status(400).json({ error: "Nạp thẻ cào chưa được cấu hình. Vui lòng liên hệ admin." });
     }

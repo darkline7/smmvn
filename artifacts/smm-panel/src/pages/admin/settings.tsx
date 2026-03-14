@@ -195,7 +195,7 @@ export default function AdminSettings() {
 
   const GENERAL_KEYS = ["site_name","site_description","site_keywords","site_author","support_email","hotline","address","fanpage_url","timezone","copyright_left","copyright_right","vnd_exchange_rate","referral_commission"];
   const BRANDING_KEYS = ["logo_url","favicon_url"];
-  const BANK_KEYS = ["bank_name","bank_account_number","bank_account_name","bank_bin","sepay_webhook_secret","sepay_enabled","min_deposit","max_deposit","card_partner_id","card_partner_key","card_api_url"];
+  const BANK_KEYS = ["bank_name","bank_account_number","bank_account_name","bank_bin","sepay_webhook_secret","sepay_enabled","min_deposit","max_deposit","card_partner_id","card_partner_key"];
   const TELEGRAM_KEYS = ["telegram_bot_token","telegram_admin_chat_id","telegram_notify_new_order","telegram_notify_new_deposit","telegram_notify_new_ticket"];
   const SMTP_KEYS = ["smtp_host","smtp_port","smtp_secure","smtp_user","smtp_pass","smtp_from_name","smtp_from_email","smtp_enabled"];
   const SECURITY_KEYS = ["google_client_id","google_client_secret","google_oauth_enabled","turnstile_site_key","turnstile_secret_key","turnstile_enabled"];
@@ -321,13 +321,12 @@ export default function AdminSettings() {
               <Field label="Nạp tối thiểu ($)" id="min_deposit" value={form.min_deposit || "1"} onChange={set("min_deposit")} type="number" />
               <Field label="Nạp tối đa ($)" id="max_deposit" value={form.max_deposit || "10000"} onChange={set("max_deposit")} type="number" />
             </SettingsSection>
-            <SettingsSection title="Thẻ cào điện thoại (gachthevip.vn)" icon={<span className="text-base">📱</span>}>
-              <p className="text-xs text-muted-foreground">Đăng ký đối tác tại <a href="https://gachthevip.vn" target="_blank" rel="noopener noreferrer" className="underline text-primary">gachthevip.vn</a> để lấy Partner ID và Partner Key.</p>
-              <Field label="API URL" id="card_api_url" value={form.card_api_url || ""} onChange={set("card_api_url")} placeholder="https://thesieure.com/chargingws/v2" description="URL API nạp thẻ (mặc định: thesieure.com)" />
-              <Field label="Partner ID" id="card_partner_id" value={form.card_partner_id || ""} onChange={set("card_partner_id")} placeholder="Partner ID" />
-              <Field label="Partner Key" id="card_partner_key" value={form.card_partner_key || ""} onChange={set("card_partner_key")} sensitive placeholder="Partner Key" />
+            <SettingsSection title="Thẻ cào điện thoại (thesieure.com)" icon={<span className="text-base">📱</span>}>
+              <p className="text-xs text-muted-foreground">Đăng ký đối tác tại <a href="https://thesieure.com" target="_blank" rel="noopener noreferrer" className="underline text-primary">thesieure.com</a> để lấy Partner ID và Partner Key.</p>
+              <Field label="Partner ID" id="card_partner_id" value={form.card_partner_id || ""} onChange={set("card_partner_id")} placeholder="Partner ID từ thesieure.com" />
+              <Field label="Partner Key" id="card_partner_key" value={form.card_partner_key || ""} onChange={set("card_partner_key")} sensitive placeholder="Partner Key từ thesieure.com" />
               <div className="space-y-1">
-                <p className="text-xs font-medium">Callback URL (nhập vào gachthevip.vn):</p>
+                <p className="text-xs font-medium">Callback URL (nhập vào thesieure.com):</p>
                 <div className="flex items-center gap-2 bg-muted border rounded px-3 py-2 font-mono text-xs break-all">
                   <span className="flex-1 select-all">{`${window.location.origin}/api/wallet/cards/callback`}</span>
                   <button type="button" className="shrink-0 hover:text-primary transition-colors"

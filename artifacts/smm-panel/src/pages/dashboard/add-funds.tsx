@@ -151,7 +151,10 @@ export default function AddFunds() {
     toast({ title: "Đã sao chép!" });
   };
 
+  const [submitting, setSubmitting] = useState(false);
+
   const onSubmit = async (values: z.infer<typeof depositSchema>) => {
+    setSubmitting(true);
     try {
       const res = await fetch(`${BASE}/api/wallet/deposits`, {
         method: "POST",
@@ -166,7 +169,22 @@ export default function AddFunds() {
       toast({ title: "Tạo lệnh nạp tiền thành công!", description: `Mã giao dịch: SMM${deposit.id}` });
     } catch {
       toast({ title: "Lỗi", description: "Không thể tạo lệnh nạp tiền", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const cancelDeposit = async () => {
+    if (!activeDeposit) return;
+    try {
+      await fetch(`${BASE}/api/wallet/deposits/${activeDeposit.id}/cancel`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {}
+    setPendingDeposit(null);
+    refetch();
+    toast({ title: "Đã hủy lệnh nạp tiền" });
   };
 
   const CopyButton = ({ text, id }: { text: string; id: string }) => (
@@ -219,6 +237,18 @@ export default function AddFunds() {
                   <CardDescription>Nhập hoặc chọn số tiền cần nạp (USD) · tối thiểu ${minDeposit}</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {activeDeposit ? (
+                    <div className="space-y-4">
+                      <div className="rounded-xl bg-primary/5 border border-primary/20 p-4">
+                        <p className="text-xs text-muted-foreground mb-1">Lệnh nạp đang chờ thanh toán</p>
+                        <p className="text-2xl font-bold text-primary">${Number(activeDeposit.amount).toFixed(2)}</p>
+                        <p className="text-sm text-muted-foreground mt-0.5">≈ {(Number(activeDeposit.amount) * vndRate).toLocaleString("vi-VN")} VND · Mã: <span className="font-bold text-foreground">SMM{activeDeposit.id}</span></p>
+                      </div>
+                      <Button variant="outline" className="w-full border-red-200 text-red-600 hover:bg-red-50" onClick={cancelDeposit}>
+                        Hủy lệnh & Tạo lệnh mới
+                      </Button>
+                    </div>
+                  ) : (
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                       <div className="grid grid-cols-3 gap-2">
@@ -242,11 +272,12 @@ export default function AddFunds() {
                           <FormMessage />
                         </FormItem>
                       )} />
-                      <Button type="submit" className="w-full" size="lg">
-                        Tạo lệnh nạp tiền →
+                      <Button type="submit" className="w-full" size="lg" disabled={submitting}>
+                        {submitting ? "Đang tạo..." : "Tạo lệnh nạp tiền →"}
                       </Button>
                     </form>
                   </Form>
+                  )}
                 </CardContent>
               </Card>
 

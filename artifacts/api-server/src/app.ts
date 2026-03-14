@@ -4,7 +4,13 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import jwt from "jsonwebtoken";
+import path from "path";
+import { fileURLToPath } from "url";
+import { existsSync } from "fs";
 import router from "./routes/index.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app: Express = express();
 
@@ -115,5 +121,20 @@ export function getSession(req: Request): SessionData | undefined {
 }
 
 app.use("/api", router);
+
+// ── Static frontend serving (production / cPanel mode) ───────────────────────
+// Serves the React build from the `public/` directory next to the server file.
+// In dev mode (Vite dev server), this folder won't exist and is skipped.
+const publicDir = path.join(__dirname, "public");
+if (existsSync(publicDir)) {
+  app.use(express.static(publicDir, {
+    maxAge: "1y",
+    index: false, // let the catch-all below handle it
+  }));
+  // SPA fallback — all non-API routes serve index.html
+  app.get("*", (_req: Request, res: Response) => {
+    res.sendFile(path.join(publicDir, "index.html"));
+  });
+}
 
 export default app;

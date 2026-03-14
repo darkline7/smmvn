@@ -80,11 +80,13 @@ async function seedUsersIfEmpty() {
 
     console.log("No users found — seeding initial users...");
 
+    const adminHash = await hashPassword("password");
+    const demoHash = await hashPassword("password");
     await db.insert(usersTable).values([
       {
         email: "admin@smmpanel.com",
         username: "admin",
-        passwordHash: hashPassword("password"),
+        passwordHash: adminHash,
         role: "admin",
         balance: "999999.0000",
         currency: "USD",
@@ -95,7 +97,7 @@ async function seedUsersIfEmpty() {
       {
         email: "demo@smmpanel.com",
         username: "demo",
-        passwordHash: hashPassword("password"),
+        passwordHash: demoHash,
         role: "user",
         balance: "50.0000",
         currency: "USD",

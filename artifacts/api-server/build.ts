@@ -1,7 +1,7 @@
 import path from "path";
 import { fileURLToPath } from "url";
 import { build as esbuild } from "esbuild";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, cp, access } from "fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +12,9 @@ const __dirname = path.dirname(__filename);
 const allowlist = [
   "@google/generative-ai",
   "axios",
+  "bcryptjs",
   "connect-pg-simple",
+  "cookie-parser",
   "cors",
   "date-fns",
   "drizzle-orm",
@@ -20,6 +22,7 @@ const allowlist = [
   "express",
   "express-rate-limit",
   "express-session",
+  "helmet",
   "jsonwebtoken",
   "memorystore",
   "multer",
@@ -67,6 +70,19 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // Copy React frontend build into dist/public (for cPanel/standalone serving)
+  const frontendDist = path.resolve(__dirname, "../../artifacts/smm-panel/dist/public");
+  const frontendDestDir = path.resolve(distDir, "public");
+  try {
+    await access(frontendDist);
+    console.log("copying frontend build → dist/public ...");
+    await cp(frontendDist, frontendDestDir, { recursive: true });
+    console.log("frontend copied ✓");
+  } catch {
+    console.warn("⚠ Frontend build not found at:", frontendDist, "— skipping copy");
+    console.warn("  Run: pnpm --filter @workspace/smm-panel run build  first");
+  }
 }
 
 buildAll().catch((err) => {

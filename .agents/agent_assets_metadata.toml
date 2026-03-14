@@ -30,3 +30,15 @@ id = "cMvGyDv-nkJFrhzAsQDz0"
 uri = "file://HUONG_DAN_DEPLOY_VPS.md"
 type = "text"
 title = "Hướng Dẫn Deploy VPS (Node.js + Nginx + PM2)"
+
+[[outputs]]
+id = "Vg6UU6QCGKfYlurdLoEpg"
+uri = "file://smm-panel-cpanel.tar.gz"
+type = "unspecified"
+title = "smm-panel-cpanel.tar.gz (2.3MB — Upload lên cPanel)"
+
+[[outputs]]
+id = "khg0F0yyPYOyluXova7vv"
+uri = "file://HUONG_DAN_DEPLOY_CPANEL_NODEJS.md"
+type = "text"
+title = "Hướng dẫn Deploy cPanel Node.js (11 bước chi tiết)"

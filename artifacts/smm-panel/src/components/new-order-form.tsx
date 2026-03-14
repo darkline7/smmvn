@@ -70,6 +70,8 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const linkRef = useRef<HTMLInputElement>(null);
+  // Prevents catId from being reset when platform is changed programmatically (e.g. via search)
+  const skipCatResetRef = useRef(false);
 
   // Settings (exchange rate)
   const { data: settings } = useQuery<any>({
@@ -158,8 +160,14 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
   // Reset when category changes
   useEffect(() => { setServiceId(null); }, [catId]);
 
-  // Reset category when platform changes
-  useEffect(() => { setCatId(""); }, [platform]);
+  // Reset category when platform changes (skip if set programmatically via search)
+  useEffect(() => {
+    if (skipCatResetRef.current) {
+      skipCatResetRef.current = false;
+      return;
+    }
+    setCatId("");
+  }, [platform]);
 
   const totalUSD = selectedService && quantity
     ? (quantity / 1000) * Number(selectedService.rate)
@@ -171,6 +179,8 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
     setShowSearch(false);
     const cat = allCategories.find((c: any) => c.id === svc.categoryId);
     if (cat) {
+      // Flag to prevent the platform-change useEffect from resetting catId
+      skipCatResetRef.current = true;
       setPlatform(detectPlatform(cat.name));
       setCatId(cat.id.toString());
     }

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useGetMe, useLogout } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { 
   LayoutDashboard, ShoppingCart, ListOrdered, Layers, 
   Wallet, Receipt, Ticket as TicketIcon, Key, 
@@ -63,6 +64,19 @@ export function DashboardLayout({ children, isAdminLayout = false }: { children:
   const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
+  const { data: pubSettings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/public/settings`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const logoUrl: string = pubSettings?.logoUrl || "";
+  const siteName: string = pubSettings?.siteName || "SMM Pro";
+
   React.useEffect(() => {
     if (!isLoading && !user) {
       setLocation("/login");
@@ -112,12 +126,20 @@ export function DashboardLayout({ children, isAdminLayout = false }: { children:
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-card border-r border-border z-20 flex-shrink-0">
         <div className="p-6 flex items-center gap-3 border-b border-border/50">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold font-display text-xl shadow-lg shadow-primary/20">
-            S
-          </div>
-          <span className="font-display font-bold tracking-tight text-xl text-foreground">
-            SMM <span className="text-primary">Pro</span>
-          </span>
+          {logoUrl ? (
+            <img src={logoUrl} alt={siteName} className="h-9 max-w-[140px] object-contain" />
+          ) : (
+            <>
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold font-display text-xl shadow-lg shadow-primary/20">
+                {siteName.charAt(0).toUpperCase()}
+              </div>
+              <span className="font-display font-bold tracking-tight text-xl text-foreground">
+                {siteName.includes(" ") ? (
+                  <>{siteName.split(" ")[0]} <span className="text-primary">{siteName.split(" ").slice(1).join(" ")}</span></>
+                ) : <span>{siteName}</span>}
+              </span>
+            </>
+          )}
         </div>
         
         <div className="flex-1 overflow-y-auto py-6 px-4 space-y-1 scrollbar-hide">
@@ -166,8 +188,16 @@ export function DashboardLayout({ children, isAdminLayout = false }: { children:
         {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between px-4 py-3 bg-card border-b border-border z-20">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold">S</div>
-            <span className="font-display font-bold text-base">SMM Pro</span>
+            {logoUrl ? (
+              <img src={logoUrl} alt={siteName} className="h-8 max-w-[120px] object-contain" />
+            ) : (
+              <>
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-bold">
+                  {siteName.charAt(0).toUpperCase()}
+                </div>
+                <span className="font-display font-bold text-base">{siteName}</span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">

@@ -103,32 +103,35 @@ function BrandingApplicator() {
 
   useEffect(() => {
     if (!data) return;
-    // Apply favicon
-    if (data.favicon_url) {
+    // Apply favicon (API returns camelCase)
+    const faviconUrl = data.faviconUrl || data.favicon_url;
+    if (faviconUrl) {
       let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
       if (!link) {
         link = document.createElement("link");
         link.rel = "icon";
         document.head.appendChild(link);
       }
-      link.href = data.favicon_url;
+      link.href = faviconUrl;
     }
     // Apply site title
-    if (data.site_name) {
+    const siteName = data.siteName || data.site_name;
+    if (siteName) {
       const current = document.title;
-      if (!current.includes(data.site_name)) {
-        document.title = data.site_name;
+      if (!current.includes(siteName)) {
+        document.title = siteName;
       }
     }
     // Meta description
-    if (data.site_description) {
+    const siteDesc = data.siteDescription || data.site_description;
+    if (siteDesc) {
       let meta = document.querySelector<HTMLMetaElement>('meta[name="description"]');
       if (!meta) {
         meta = document.createElement("meta");
         meta.name = "description";
         document.head.appendChild(meta);
       }
-      meta.content = data.site_description;
+      meta.content = siteDesc;
     }
   }, [data]);
 

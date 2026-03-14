@@ -184,12 +184,22 @@ async function syncOneProvider(provider: typeof providersTable.$inferSelect): Pr
   }
 }
 
+function verifyCronSecret(provided: unknown, expected: string): boolean {
+  if (!expected || !provided || typeof provided !== "string") return false;
+  try {
+    const a = Buffer.from(provided.padEnd(expected.length));
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return require("crypto").timingSafeEqual(a, b);
+  } catch { return false; }
+}
+
 // GET /api/cron/sync-all?secret=xxx — returns DB stats immediately, syncs in background
 router.get("/cron/sync-all", async (req, res) => {
   try {
     const settings = await getSettings();
     const cronSecret = settings["cron_secret"] || "";
-    if (!cronSecret || req.query.secret !== cronSecret) {
+    if (!verifyCronSecret(req.query.secret, cronSecret)) {
       return res.status(401).json({ error: "Invalid cron secret" });
     }
 
@@ -241,7 +251,7 @@ router.get("/cron/sync/:id", async (req, res) => {
   try {
     const settings = await getSettings();
     const cronSecret = settings["cron_secret"] || "";
-    if (!cronSecret || req.query.secret !== cronSecret) {
+    if (!verifyCronSecret(req.query.secret, cronSecret)) {
       return res.status(401).json({ error: "Invalid cron secret" });
     }
     const [provider] = await db.select().from(providersTable).where(eq(providersTable.id, Number(req.params.id))).limit(1);
@@ -258,7 +268,7 @@ router.get("/cron/update-orders", async (req, res) => {
   try {
     const settings = await getSettings();
     const cronSecret = settings["cron_secret"] || "";
-    if (!cronSecret || req.query.secret !== cronSecret) {
+    if (!verifyCronSecret(req.query.secret, cronSecret)) {
       return res.status(401).json({ error: "Invalid cron secret" });
     }
 

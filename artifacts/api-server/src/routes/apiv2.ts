@@ -75,21 +75,24 @@ router.post("/", async (req: Request, res: Response) => {
         const qty = Number(quantity);
         if (qty < svc[0].min || qty > svc[0].max) throw new Error(`Quantity must be between ${svc[0].min} and ${svc[0].max}`);
         const charge = (Number(svc[0].rate) * qty) / 1000;
-        if (Number(user.balance) < charge) throw new Error("Insufficient balance");
-        const newBalance = Number(user.balance) - charge;
-        const [order] = await db.insert(ordersTable).values({
-          userId: user.id, serviceId: Number(serviceId), link, quantity: qty,
-          charge: charge.toFixed(4), status: "pending",
-          runs: body.runs ? Number(body.runs) : undefined,
-          interval: body.interval ? Number(body.interval) : undefined,
-          comments: body.comments,
-          username: body.username,
-        }).returning();
-        await Promise.all([
-          db.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, user.id)),
-          db.insert(transactionsTable).values({ userId: user.id, type: "order", amount: (-charge).toFixed(4), balanceAfter: newBalance.toFixed(4), description: `API Order #${order.id}`, referenceId: order.id }),
-          db.insert(orderLogsTable).values({ orderId: order.id, status: "pending", note: "Order created via API" }),
-        ]);
+        // Atomic balance deduction inside transaction to prevent race conditions
+        const order = await db.transaction(async (tx) => {
+          const [freshUser] = await tx.select({ balance: usersTable.balance }).from(usersTable).where(eq(usersTable.id, user.id)).limit(1);
+          if (!freshUser || Number(freshUser.balance) < charge) throw new Error("Insufficient balance");
+          const newBalance = Number(freshUser.balance) - charge;
+          const [newOrder] = await tx.insert(ordersTable).values({
+            userId: user.id, serviceId: Number(serviceId), link, quantity: qty,
+            charge: charge.toFixed(4), status: "pending",
+            runs: body.runs ? Number(body.runs) : undefined,
+            interval: body.interval ? Number(body.interval) : undefined,
+            comments: body.comments,
+            username: body.username,
+          }).returning();
+          await tx.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, user.id));
+          await tx.insert(transactionsTable).values({ userId: user.id, type: "order", amount: (-charge).toFixed(4), balanceAfter: newBalance.toFixed(4), description: `API Order #${newOrder.id}`, referenceId: newOrder.id });
+          await tx.insert(orderLogsTable).values({ orderId: newOrder.id, status: "pending", note: "Order created via API" });
+          return newOrder;
+        });
         responseData = { order: order.id };
         break;
       }

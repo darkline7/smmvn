@@ -127,6 +127,40 @@ Actions: `services`, `add`, `status`, `multiple_status`, `balance`, `refill`, `r
 
 Auth: `key` parameter (API key from user profile)
 
+Rate limit: 120 requests/minute per IP
+
+## Security Architecture
+
+Full audit completed 2026-03-14. See `SECURITY_AUDIT_REPORT.md` for details.
+
+### Password Hashing
+- **New users:** bcryptjs (cost factor 12) — each password has its own random salt
+- **Migration:** Legacy SHA-256 users verified and silently upgraded to bcrypt on next login
+- Max password length: 128 characters (DoS prevention)
+
+### Race Condition Protection
+All balance-modifying operations use DB transactions:
+- `POST /orders` — single order
+- `POST /orders/mass` — mass order
+- `POST /api/v2` (action: add) — API v2 order
+- `POST /admin/users/:id/balance` — admin balance adjustment
+- `POST /admin/payments/:id/approve` — deposit approval
+
+### Input Validation
+- Admin role changes: validated enum `["user","admin","reseller"]`
+- Order/ticket status: validated enum
+- Services/categories: explicit field whitelist (no mass assignment)
+- Admin order PATCH: validated status enum
+
+### Timing Attack Protections
+- Cron secret: `crypto.timingSafeEqual` comparison
+- Legacy password comparison: `crypto.timingSafeEqual`
+
+### Rate Limiting
+- Auth endpoints: 20 requests/15 minutes
+- API v2: 120 requests/minute
+- Global: 300 requests/minute
+
 ## Database Operations
 
 - Push schema: `pnpm --filter @workspace/db run push`

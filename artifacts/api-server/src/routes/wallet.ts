@@ -83,7 +83,8 @@ router.post("/deposits/:id/cancel", requireAuth as any, async (req: AuthRequest,
     await db.update(depositsTable).set({ status: "rejected", note: "Người dùng hủy lệnh" }).where(eq(depositsTable.id, id));
     return res.json({ ok: true });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    console.error("[wallet/cancel]", e.message);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 

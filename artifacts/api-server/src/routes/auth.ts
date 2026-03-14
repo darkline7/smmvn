@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { usersTable, siteSettingsTable } from "@workspace/db/schema";
 import { eq, or } from "drizzle-orm";
-import { hashPassword, generateApiKey, generateReferralCode } from "../lib/auth.js";
+import { hashPassword, verifyPassword, generateApiKey, generateReferralCode } from "../lib/auth.js";
 import { setSession, getSession } from "../app.js";
 import { authRateLimit } from "../lib/rate-limits.js";
 import { z } from "zod";
@@ -35,7 +35,7 @@ async function verifyTurnstile(token: string, secretKey: string): Promise<boolea
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(6).max(128),
   username: z.string().min(3).max(30),
   referralCode: z.string().optional(),
   turnstileToken: z.string().optional(),
@@ -77,7 +77,7 @@ router.post("/register", authRateLimit, async (req: Request, res: Response) => {
     const [user] = await db.insert(usersTable).values({
       email: data.email,
       username: data.username,
-      passwordHash: hashPassword(data.password),
+      passwordHash: await hashPassword(data.password),
       apiKey: generateApiKey(),
       referralCode: generateReferralCode(),
     }).returning();
@@ -106,7 +106,8 @@ router.post("/login", authRateLimit, async (req: Request, res: Response) => {
     }
 
     const [user] = await db.select().from(usersTable).where(eq(usersTable.email, data.email)).limit(1);
-    if (!user || user.passwordHash !== hashPassword(data.password)) {
+    const passwordValid = user ? await verifyPassword(data.password, user.passwordHash, user.id) : false;
+    if (!user || !passwordValid) {
       return res.status(401).json({ error: "Email hoặc mật khẩu không đúng" });
     }
     if (user.banned) {
@@ -177,7 +178,9 @@ router.get("/google/callback", async (req: Request, res: Response) => {
         }
         res.clearCookie("oauth_state", { httpOnly: true, sameSite: "lax", path: "/" });
       }
-    } catch { /* invalid state — continue */ }
+    } catch {
+      return res.redirect(`${frontendUrl}/login?error=oauth_state_invalid`);
+    }
 
     // Exchange code for tokens
     const tokenResp = await fetch("https://oauth2.googleapis.com/token", {
@@ -210,7 +213,7 @@ router.get("/google/callback", async (req: Request, res: Response) => {
       [user] = await db.insert(usersTable).values({
         email: googleUser.email,
         username: safeUsername,
-        passwordHash: hashPassword(Math.random().toString(36) + Date.now()),
+        passwordHash: await hashPassword(crypto.randomBytes(32).toString("hex")),
         apiKey: generateApiKey(),
         referralCode: generateReferralCode(),
         emailVerified: true,

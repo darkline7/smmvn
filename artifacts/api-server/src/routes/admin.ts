@@ -110,11 +110,15 @@ router.get("/users/:id", async (req: AuthRequest, res: any) => {
 });
 
 router.patch("/users/:id", async (req: AuthRequest, res: any) => {
+  const VALID_ROLES = ["user", "admin", "reseller"] as const;
   const { username, role, banned } = req.body;
+  if (role !== undefined && !VALID_ROLES.includes(role)) {
+    return res.status(400).json({ error: `Invalid role. Must be one of: ${VALID_ROLES.join(", ")}` });
+  }
   const updates: any = { updatedAt: new Date() };
-  if (username !== undefined) updates.username = username;
+  if (username !== undefined) updates.username = String(username).slice(0, 30);
   if (role !== undefined) updates.role = role;
-  if (banned !== undefined) updates.banned = banned;
+  if (banned !== undefined) updates.banned = Boolean(banned);
   const updated = await db.update(usersTable).set(updates).where(eq(usersTable.id, Number(req.params.id))).returning();
   if (!updated[0]) return res.status(404).json({ error: "Not found" });
   const { passwordHash, ...safeUser } = updated[0];
@@ -123,16 +127,22 @@ router.patch("/users/:id", async (req: AuthRequest, res: any) => {
 
 router.post("/users/:id/balance", async (req: AuthRequest, res: any) => {
   const { amount, note } = req.body;
-  if (typeof amount !== "number") return res.status(400).json({ error: "amount required" });
-  const user = await db.select().from(usersTable).where(eq(usersTable.id, Number(req.params.id))).limit(1);
-  if (!user[0]) return res.status(404).json({ error: "Not found" });
-  const newBalance = Number(user[0].balance) + amount;
-  if (newBalance < 0) return res.status(400).json({ error: "Balance cannot go negative" });
-  await Promise.all([
-    db.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, Number(req.params.id))),
-    db.insert(transactionsTable).values({ userId: Number(req.params.id), type: "adjustment", amount: amount.toFixed(4), balanceAfter: newBalance.toFixed(4), description: note || "Admin adjustment" }),
-  ]);
-  return res.json({ success: true, message: "Balance adjusted" });
+  if (typeof amount !== "number" || isNaN(amount)) return res.status(400).json({ error: "amount must be a number" });
+  if (Math.abs(amount) > 1000000) return res.status(400).json({ error: "Amount exceeds maximum allowed adjustment" });
+  const userId = Number(req.params.id);
+  try {
+    await db.transaction(async (tx) => {
+      const [user] = await tx.select({ balance: usersTable.balance }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+      if (!user) throw new Error("User not found");
+      const newBalance = Number(user.balance) + amount;
+      if (newBalance < 0) throw new Error("Balance cannot go negative");
+      await tx.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, userId));
+      await tx.insert(transactionsTable).values({ userId, type: "adjustment", amount: amount.toFixed(4), balanceAfter: newBalance.toFixed(4), description: note || "Admin adjustment" });
+    });
+    return res.json({ success: true, message: "Balance adjusted" });
+  } catch (e: any) {
+    return res.status(400).json({ error: e.message });
+  }
 });
 
 // ORDERS
@@ -169,11 +179,15 @@ router.get("/orders", async (req: AuthRequest, res: any) => {
 });
 
 router.patch("/orders/:id", async (req: AuthRequest, res: any) => {
+  const VALID_ORDER_STATUSES = ["pending", "processing", "active", "partial", "completed", "cancelled", "failed", "refunded"] as const;
   const { status, startCount, remains, note } = req.body;
   if (!status) return res.status(400).json({ error: "status required" });
+  if (!VALID_ORDER_STATUSES.includes(status)) {
+    return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_ORDER_STATUSES.join(", ")}` });
+  }
   const updates: any = { status, updatedAt: new Date() };
-  if (startCount !== undefined) updates.startCount = startCount;
-  if (remains !== undefined) updates.remains = remains;
+  if (startCount !== undefined) updates.startCount = Number(startCount);
+  if (remains !== undefined) updates.remains = Number(remains);
   const updated = await db.update(ordersTable).set(updates).where(eq(ordersTable.id, Number(req.params.id))).returning();
   if (!updated[0]) return res.status(404).json({ error: "Not found" });
   await db.insert(orderLogsTable).values({ orderId: Number(req.params.id), status, note: note || `Status changed to ${status} by admin` });
@@ -199,7 +213,25 @@ router.get("/services", async (req: AuthRequest, res: any) => {
 
 router.post("/services", async (req: AuthRequest, res: any) => {
   try {
-    const [service] = await db.insert(servicesTable).values(req.body).returning();
+    const { name, categoryId, providerId, providerServiceId, type, rate, min, max, description, features, sortOrder, status } = req.body;
+    if (!name || !categoryId || rate === undefined || min === undefined || max === undefined) {
+      return res.status(400).json({ error: "name, categoryId, rate, min, max are required" });
+    }
+    const VALID_SERVICE_STATUSES = ["active", "inactive", "disabled"];
+    const [service] = await db.insert(servicesTable).values({
+      name: String(name).slice(0, 200),
+      categoryId: Number(categoryId),
+      providerId: providerId ? Number(providerId) : null,
+      providerServiceId: providerServiceId ? String(providerServiceId) : null,
+      type: type || "default",
+      rate: String(rate),
+      min: Number(min),
+      max: Number(max),
+      description: description ? String(description).slice(0, 2000) : null,
+      features: Array.isArray(features) ? features : [],
+      sortOrder: sortOrder ? Number(sortOrder) : 0,
+      status: VALID_SERVICE_STATUSES.includes(status) ? status : "active",
+    }).returning();
     return res.status(201).json(service);
   } catch (e: any) {
     return res.status(400).json({ error: e.message });
@@ -207,7 +239,22 @@ router.post("/services", async (req: AuthRequest, res: any) => {
 });
 
 router.patch("/services/:id", async (req: AuthRequest, res: any) => {
-  const updated = await db.update(servicesTable).set({ ...req.body, updatedAt: new Date() }).where(eq(servicesTable.id, Number(req.params.id))).returning();
+  const VALID_SERVICE_STATUSES = ["active", "inactive", "disabled"];
+  const { name, categoryId, providerId, providerServiceId, type, rate, min, max, description, features, sortOrder, status } = req.body;
+  const updates: any = { updatedAt: new Date() };
+  if (name !== undefined) updates.name = String(name).slice(0, 200);
+  if (categoryId !== undefined) updates.categoryId = Number(categoryId);
+  if (providerId !== undefined) updates.providerId = providerId ? Number(providerId) : null;
+  if (providerServiceId !== undefined) updates.providerServiceId = providerServiceId ? String(providerServiceId) : null;
+  if (type !== undefined) updates.type = String(type);
+  if (rate !== undefined) updates.rate = String(rate);
+  if (min !== undefined) updates.min = Number(min);
+  if (max !== undefined) updates.max = Number(max);
+  if (description !== undefined) updates.description = description ? String(description).slice(0, 2000) : null;
+  if (features !== undefined) updates.features = Array.isArray(features) ? features : [];
+  if (sortOrder !== undefined) updates.sortOrder = Number(sortOrder);
+  if (status !== undefined) updates.status = VALID_SERVICE_STATUSES.includes(status) ? status : "active";
+  const updated = await db.update(servicesTable).set(updates).where(eq(servicesTable.id, Number(req.params.id))).returning();
   if (!updated[0]) return res.status(404).json({ error: "Not found" });
   return res.json(updated[0]);
 });
@@ -229,7 +276,14 @@ router.get("/categories", async (req: AuthRequest, res: any) => {
 
 router.post("/categories", async (req: AuthRequest, res: any) => {
   try {
-    const [cat] = await db.insert(categoriesTable).values(req.body).returning();
+    const { name, description, sortOrder, active } = req.body;
+    if (!name) return res.status(400).json({ error: "name is required" });
+    const [cat] = await db.insert(categoriesTable).values({
+      name: String(name).slice(0, 100),
+      description: description ? String(description).slice(0, 500) : null,
+      sortOrder: sortOrder ? Number(sortOrder) : 0,
+      active: active !== false,
+    }).returning();
     return res.status(201).json(cat);
   } catch (e: any) {
     return res.status(400).json({ error: e.message });
@@ -250,7 +304,13 @@ router.post("/categories/reorder", async (req: AuthRequest, res: any) => {
 });
 
 router.patch("/categories/:id", async (req: AuthRequest, res: any) => {
-  const updated = await db.update(categoriesTable).set({ ...req.body, updatedAt: new Date() }).where(eq(categoriesTable.id, Number(req.params.id))).returning();
+  const { name, description, sortOrder, active } = req.body;
+  const updates: any = { updatedAt: new Date() };
+  if (name !== undefined) updates.name = String(name).slice(0, 100);
+  if (description !== undefined) updates.description = description ? String(description).slice(0, 500) : null;
+  if (sortOrder !== undefined) updates.sortOrder = Number(sortOrder);
+  if (active !== undefined) updates.active = Boolean(active);
+  const updated = await db.update(categoriesTable).set(updates).where(eq(categoriesTable.id, Number(req.params.id))).returning();
   if (!updated[0]) return res.status(404).json({ error: "Not found" });
   return res.json(updated[0]);
 });
@@ -461,16 +521,22 @@ router.post("/payments/:id/approve", async (req: AuthRequest, res: any) => {
   if (deposit[0].status !== "pending") return res.status(400).json({ error: "Deposit already processed" });
   
   const amount = req.body?.amount ? Number(req.body.amount) : Number(deposit[0].amount);
-  const user = await db.select().from(usersTable).where(eq(usersTable.id, deposit[0].userId)).limit(1);
-  if (!user[0]) return res.status(404).json({ error: "User not found" });
-  
-  const newBalance = Number(user[0].balance) + amount;
-  await Promise.all([
-    db.update(depositsTable).set({ status: "approved", adminNote: req.body?.note, updatedAt: new Date() }).where(eq(depositsTable.id, deposit[0].id)),
-    db.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, deposit[0].userId)),
-    db.insert(transactionsTable).values({ userId: deposit[0].userId, type: "deposit", amount: amount.toFixed(4), balanceAfter: newBalance.toFixed(4), description: `Deposit approved #${deposit[0].id}`, referenceId: deposit[0].id }),
-  ]);
-  return res.json({ success: true, message: "Deposit approved" });
+  if (isNaN(amount) || amount <= 0) return res.status(400).json({ error: "Invalid amount" });
+  try {
+    await db.transaction(async (tx) => {
+      const [freshDeposit] = await tx.select({ status: depositsTable.status }).from(depositsTable).where(eq(depositsTable.id, deposit[0].id)).limit(1);
+      if (!freshDeposit || freshDeposit.status !== "pending") throw new Error("Deposit already processed");
+      const [user] = await tx.select({ balance: usersTable.balance }).from(usersTable).where(eq(usersTable.id, deposit[0].userId)).limit(1);
+      if (!user) throw new Error("User not found");
+      const newBalance = Number(user.balance) + amount;
+      await tx.update(depositsTable).set({ status: "approved", adminNote: req.body?.note, updatedAt: new Date() }).where(eq(depositsTable.id, deposit[0].id));
+      await tx.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, deposit[0].userId));
+      await tx.insert(transactionsTable).values({ userId: deposit[0].userId, type: "deposit", amount: amount.toFixed(4), balanceAfter: newBalance.toFixed(4), description: `Deposit approved #${deposit[0].id}`, referenceId: deposit[0].id });
+    });
+    return res.json({ success: true, message: "Deposit approved" });
+  } catch (e: any) {
+    return res.status(400).json({ error: e.message });
+  }
 });
 
 router.post("/payments/:id/reject", async (req: AuthRequest, res: any) => {

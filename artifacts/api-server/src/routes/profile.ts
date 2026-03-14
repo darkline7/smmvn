@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
-import { requireAuth, hashPassword, generateApiKey } from "../lib/auth.js";
+import { requireAuth, hashPassword, verifyPassword, generateApiKey } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
 import { z } from "zod";
 
@@ -17,10 +17,10 @@ router.get("/", requireAuth as any, async (req: AuthRequest, res: Response) => {
 
 router.patch("/", requireAuth as any, async (req: AuthRequest, res: Response) => {
   const schema = z.object({
-    username: z.string().min(3).optional(),
+    username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/, "Username chỉ chứa chữ, số và _").optional(),
     currentPassword: z.string().optional(),
-    newPassword: z.string().min(6).optional(),
-    timezone: z.string().optional(),
+    newPassword: z.string().min(8).optional(),
+    timezone: z.string().max(50).optional(),
   });
   try {
     const data = schema.parse(req.body);
@@ -31,10 +31,11 @@ router.patch("/", requireAuth as any, async (req: AuthRequest, res: Response) =>
     if (data.username) updates.username = data.username;
     if (data.timezone) updates.timezone = data.timezone;
     if (data.newPassword && data.currentPassword) {
-      if (user.passwordHash !== hashPassword(data.currentPassword)) {
+      const valid = await verifyPassword(data.currentPassword, user.passwordHash, user.id);
+      if (!valid) {
         return res.status(400).json({ error: "Current password is incorrect" });
       }
-      updates.passwordHash = hashPassword(data.newPassword);
+      updates.passwordHash = await hashPassword(data.newPassword);
     }
 
     const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, req.userId!)).returning();
@@ -54,11 +55,12 @@ router.post("/api-key", requireAuth as any, async (req: AuthRequest, res: Respon
 router.post("/password", requireAuth as any, async (req: AuthRequest, res: Response) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) return res.status(400).json({ error: "currentPassword and newPassword required" });
-  if (newPassword.length < 6) return res.status(400).json({ error: "Mật khẩu mới tối thiểu 6 ký tự" });
+  if (newPassword.length < 8) return res.status(400).json({ error: "Mật khẩu mới tối thiểu 8 ký tự" });
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1);
   if (!user) return res.status(404).json({ error: "Not found" });
-  if (user.passwordHash !== hashPassword(currentPassword)) return res.status(400).json({ error: "Mật khẩu hiện tại không đúng" });
-  await db.update(usersTable).set({ passwordHash: hashPassword(newPassword), updatedAt: new Date() }).where(eq(usersTable.id, req.userId!));
+  const valid = await verifyPassword(currentPassword, user.passwordHash, user.id);
+  if (!valid) return res.status(400).json({ error: "Mật khẩu hiện tại không đúng" });
+  await db.update(usersTable).set({ passwordHash: await hashPassword(newPassword), updatedAt: new Date() }).where(eq(usersTable.id, req.userId!));
   return res.json({ success: true });
 });
 

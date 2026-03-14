@@ -12,6 +12,7 @@ import adminRouter from "./admin.js";
 import apiv2Router from "./apiv2.js";
 import sepayRouter from "./sepay.js";
 import subdomainsRouter from "./subdomains.js";
+import { apiv2RateLimit } from "../lib/rate-limits.js";
 
 const router = Router();
 
@@ -25,7 +26,7 @@ router.use("/tickets", ticketsRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/", miscRouter);
 router.use("/admin", adminRouter);
-router.use("/v2", apiv2Router);
+router.use("/v2", apiv2RateLimit, apiv2Router);
 router.use("/webhooks", sepayRouter);
 router.use("/subdomains", subdomainsRouter);
 

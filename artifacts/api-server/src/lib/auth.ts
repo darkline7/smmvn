@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { getSession } from "../app.js";
 
 export interface AuthRequest extends Request {
@@ -10,8 +11,57 @@ export interface AuthRequest extends Request {
   userRole?: string;
 }
 
-export function hashPassword(password: string): string {
-  return crypto.createHash("sha256").update(password + (process.env.SECRET_SALT || "smm-panel-salt-2024")).digest("hex");
+const BCRYPT_ROUNDS = 12;
+
+// Legacy SHA-256 hash for migration (detects old hashes on login)
+function legacyHash(password: string): string {
+  return crypto.createHash("sha256")
+    .update(password + (process.env.SECRET_SALT || "smm-panel-salt-2024"))
+    .digest("hex");
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
+}
+
+// Synchronous wrapper kept for non-login use cases (API key gen etc.)
+// NOTE: Do not use for password hashing — always use the async version
+export function hashPasswordSync(password: string): string {
+  return bcrypt.hashSync(password, BCRYPT_ROUNDS);
+}
+
+/**
+ * Verify password — handles both bcrypt (new) and legacy SHA-256 (old).
+ * On successful legacy login, transparently upgrades to bcrypt.
+ */
+export async function verifyPassword(
+  password: string,
+  storedHash: string,
+  userId?: number,
+): Promise<boolean> {
+  // Bcrypt hashes always start with $2a$ or $2b$
+  if (storedHash.startsWith("$2")) {
+    return bcrypt.compare(password, storedHash);
+  }
+
+  // Legacy SHA-256 hash — verify and upgrade in-place
+  const legacyDigest = legacyHash(password);
+  // Use constant-time comparison to prevent timing attacks
+  const legacyBuf = Buffer.from(legacyDigest);
+  const storedBuf = Buffer.from(storedHash);
+  if (legacyBuf.length !== storedBuf.length) return false;
+  const match = crypto.timingSafeEqual(legacyBuf, storedBuf);
+
+  if (match && userId) {
+    // Upgrade to bcrypt silently — non-blocking
+    const newHash = await hashPassword(password);
+    db.update(usersTable)
+      .set({ passwordHash: newHash })
+      .where(eq(usersTable.id, userId))
+      .catch(e => console.error("[auth] password upgrade failed:", e.message));
+  }
+
+  return match;
 }
 
 export function generateApiKey(): string {

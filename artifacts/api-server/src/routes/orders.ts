@@ -72,39 +72,48 @@ router.post("/", requireAuth as any, async (req: AuthRequest, res: any) => {
     }
 
     const charge = (Number(service[0].rate) * data.quantity) / 1000;
-    
-    const user = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1);
-    if (!user[0] || Number(user[0].balance) < charge) {
-      return res.status(400).json({ error: "Insufficient balance" });
+
+    // Atomic balance deduction + order creation in a single DB transaction
+    // prevents race conditions where concurrent requests could overdraft balance
+    let order: typeof ordersTable.$inferSelect;
+    try {
+      order = await db.transaction(async (tx) => {
+        // Re-read balance inside transaction with row-lock semantics
+        const [freshUser] = await tx.select({ id: usersTable.id, balance: usersTable.balance })
+          .from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1);
+        if (!freshUser || Number(freshUser.balance) < charge) {
+          throw new Error("Insufficient balance");
+        }
+        const newBalance = Number(freshUser.balance) - charge;
+        const [newOrder] = await tx.insert(ordersTable).values({
+          userId: req.userId!,
+          serviceId: data.serviceId,
+          link: data.link,
+          quantity: data.quantity,
+          charge: charge.toFixed(4),
+          status: "pending",
+          runs: data.runs,
+          interval: data.interval,
+          comments: data.comments,
+          username: data.username,
+        }).returning();
+        await tx.update(usersTable)
+          .set({ balance: newBalance.toFixed(4) })
+          .where(eq(usersTable.id, req.userId!));
+        await tx.insert(transactionsTable).values({
+          userId: req.userId!,
+          type: "order",
+          amount: (-charge).toFixed(4),
+          balanceAfter: newBalance.toFixed(4),
+          description: `Order #${newOrder.id} - ${service[0].name}`,
+          referenceId: newOrder.id,
+        });
+        await tx.insert(orderLogsTable).values({ orderId: newOrder.id, status: "pending", note: "Order created" });
+        return newOrder;
+      });
+    } catch (txErr: any) {
+      return res.status(400).json({ error: txErr.message || "Order creation failed" });
     }
-
-    const newBalance = Number(user[0].balance) - charge;
-    
-    const [order] = await db.insert(ordersTable).values({
-      userId: req.userId!,
-      serviceId: data.serviceId,
-      link: data.link,
-      quantity: data.quantity,
-      charge: charge.toFixed(4),
-      status: "pending",
-      runs: data.runs,
-      interval: data.interval,
-      comments: data.comments,
-      username: data.username,
-    }).returning();
-
-    await Promise.all([
-      db.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, req.userId!)),
-      db.insert(transactionsTable).values({
-        userId: req.userId!,
-        type: "order",
-        amount: (-charge).toFixed(4),
-        balanceAfter: newBalance.toFixed(4),
-        description: `Order #${order.id} - ${service[0].name}`,
-        referenceId: order.id,
-      }),
-      db.insert(orderLogsTable).values({ orderId: order.id, status: "pending", note: "Order created" }),
-    ]);
 
     // Forward order to provider API if service has a provider
     if (service[0].providerId && service[0].providerServiceId) {
@@ -162,15 +171,16 @@ router.post("/mass", requireAuth as any, async (req: AuthRequest, res: any) => {
       if (!service[0]) { results.push({ index: i, success: false, error: "Service not found" }); continue; }
       if (data.quantity < service[0].min || data.quantity > service[0].max) { results.push({ index: i, success: false, error: `Qty must be ${service[0].min}-${service[0].max}` }); continue; }
       const charge = (Number(service[0].rate) * data.quantity) / 1000;
-      const user = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1);
-      if (!user[0] || Number(user[0].balance) < charge) { results.push({ index: i, success: false, error: "Insufficient balance" }); continue; }
-      const newBalance = Number(user[0].balance) - charge;
-      const [order] = await db.insert(ordersTable).values({ userId: req.userId!, serviceId: data.serviceId, link: data.link, quantity: data.quantity, charge: charge.toFixed(4), status: "pending" }).returning();
-      await Promise.all([
-        db.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, req.userId!)),
-        db.insert(transactionsTable).values({ userId: req.userId!, type: "order", amount: (-charge).toFixed(4), balanceAfter: newBalance.toFixed(4), description: `Order #${order.id}`, referenceId: order.id }),
-      ]);
-      results.push({ index: i, success: true, orderId: order.id });
+      const newOrder = await db.transaction(async (tx) => {
+        const [freshUser] = await tx.select({ balance: usersTable.balance }).from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1);
+        if (!freshUser || Number(freshUser.balance) < charge) throw new Error("Insufficient balance");
+        const newBalance = Number(freshUser.balance) - charge;
+        const [o] = await tx.insert(ordersTable).values({ userId: req.userId!, serviceId: data.serviceId, link: data.link, quantity: data.quantity, charge: charge.toFixed(4), status: "pending" }).returning();
+        await tx.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, req.userId!));
+        await tx.insert(transactionsTable).values({ userId: req.userId!, type: "order", amount: (-charge).toFixed(4), balanceAfter: newBalance.toFixed(4), description: `Order #${o.id}`, referenceId: o.id });
+        return o;
+      });
+      results.push({ index: i, success: true, orderId: newOrder.id });
     } catch (e: any) {
       results.push({ index: i, success: false, error: e.message });
     }

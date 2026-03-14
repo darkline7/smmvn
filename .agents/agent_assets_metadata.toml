@@ -6,3 +6,9 @@ id = "DCDlmUq2Q61Rj_sbKm5oV"
 uri = "file://HUONG_DAN_DEPLOY_CPANEL.md"
 type = "text"
 title = "Hướng dẫn Deploy SMM Panel lên cPanel"
+
+[[outputs]]
+id = "mo7xcFWSSR7ORupUoMWbQ"
+uri = "file://SECURITY_AUDIT_REPORT.md"
+type = "text"
+title = "Báo Cáo Kiểm Tra Bảo Mật — SMM Panel Pro"

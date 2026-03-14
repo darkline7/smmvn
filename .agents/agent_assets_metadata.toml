@@ -48,3 +48,15 @@ id = "8zZYAujCOwLRKp_FunB30"
 uri = "file://smm-panel-cpanel-php.tar.gz"
 type = "unspecified"
 title = "SMM Panel Pro — PHP cPanel Package (1.9MB)"
+
+[[outputs]]
+id = "nnSfW-Q8e_lAoqhAG7sK6"
+uri = "file://smm-panel-cpanel-mvc.tar.gz"
+type = "unspecified"
+title = "SMM Panel PHP MVC — Production Ready (360KB)"
+
+[[outputs]]
+id = "M01FxzYzxopW1qjOiFFV_"
+uri = "file://SECURITY_AUDIT.md"
+type = "text"
+title = "Security Audit Report — 22 Vulnerabilities Analyzed & Fixed"

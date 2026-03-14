@@ -1,0 +1,123 @@
+Act as a senior Full-Stack PHP Architect, Security Engineer, and DevOps specialist.
+
+I have a web project that needs to be converted into a fully working **PHP production application** that can run on standard shared hosting (Apache + PHP + MySQL).
+
+Your tasks:
+
+1. **Convert the entire project to PHP**
+
+* Rebuild backend logic in PHP
+* Ensure compatibility with shared hosting (cPanel environment)
+* Do not rely on Node.js, npm, or server processes
+* Ensure all routes work through PHP controllers or routing
+
+2. **Ensure full project completeness**
+   Generate a full working structure including:
+
+/public
+/index.php
+/config
+/controllers
+/models
+/routes
+/middleware
+/views
+/helpers
+/.htaccess
+/.env.example
+
+3. **Database**
+
+* Use MySQL or MariaDB
+* Use PDO with prepared statements
+* Prevent SQL injection
+* Create database connection system
+* Include example schema
+
+4. **Security hardening**
+   Audit and fix vulnerabilities:
+
+* SQL Injection
+* XSS
+* CSRF
+* File upload vulnerabilities
+* Path traversal
+* Remote code execution
+* Authentication bypass
+* Session hijacking
+* IDOR vulnerabilities
+* Insecure direct object access
+* Unsafe eval or execution
+* Sensitive data exposure
+
+5. **Protection against attacks**
+   Implement protections against:
+
+* DDoS
+* Bot abuse
+* Brute force login
+* Spam requests
+* API abuse
+* Web scraping
+* Credential stuffing
+* Defacement attempts
+
+Implement:
+
+* rate limiting
+* captcha
+* IP throttling
+* request validation
+* bot detection
+
+6. **Server hardening**
+   Provide:
+
+* secure .htaccess
+* security headers
+* disable directory listing
+* block dangerous file access
+* prevent execution in upload folders
+
+7. **Security headers**
+   Include:
+
+Content-Security-Policy
+X-Frame-Options
+X-Content-Type-Options
+Strict-Transport-Security
+Referrer-Policy
+Permissions-Policy
+
+8. **Error handling**
+
+* Safe error handling
+* Production logging
+* Hide stack traces from users
+
+9. **Code quality**
+
+* Clean architecture
+* MVC pattern
+* Secure coding practices
+* Maintainability
+
+10. **Deployment readiness**
+    Ensure the project runs immediately after upload on shared hosting.
+
+Provide:
+
+* complete project files
+* installation instructions
+* database setup instructions
+* configuration instructions
+
+11. **Security audit report**
+    After building the code, return:
+
+* vulnerability list
+* severity (Low / Medium / High / Critical)
+* exploit explanation
+* fixed secure implementation
+
+Think like a real attacker and defend the system before deploying.

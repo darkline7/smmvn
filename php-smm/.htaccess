@@ -1,0 +1,145 @@
+##############################################################################
+# SMM PANEL PRO — Apache .htaccess Security Configuration
+# Upload this to public_html/ root alongside index.php
+##############################################################################
+
+Options -Indexes -ExecCGI -Includes
+ServerSignature Off
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # ── Block dotfiles access (except .htaccess itself) ─────────────────────────
+    RewriteRule ^(\.|.+/\.) - [F,L]
+
+    # ── Block access to sensitive directories ────────────────────────────────────
+    RewriteRule ^(config|controllers|models|middleware|helpers|routes)(/|$) - [F,L]
+
+    # ── Block direct PHP execution in upload directories ─────────────────────────
+    RewriteRule ^uploads/.*\.php$ - [F,L]
+
+    # ── Block common attack patterns in URI ──────────────────────────────────────
+    RewriteCond %{QUERY_STRING} (base64_encode|GLOBALS|_REQUEST) [NC,OR]
+    RewriteCond %{QUERY_STRING} (<|%3C).*script.*(>|%3E) [NC,OR]
+    RewriteCond %{QUERY_STRING} (\.\./|\.\.\\) [NC]
+    RewriteRule .* - [F]
+
+    # ── Block SQL injection in URL ────────────────────────────────────────────────
+    RewriteCond %{QUERY_STRING} (union.*select|insert.*into|delete.*from|drop.*table) [NC]
+    RewriteRule .* - [F]
+
+    # ── API routing: all /api/* → index.php ──────────────────────────────────────
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^api/(.*)$ index.php [QSA,L]
+
+    RewriteRule ^api/?$ index.php [QSA,L]
+
+    # ── SPA fallback: non-asset, non-api routes → index.html ─────────────────────
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} !^/api/
+    RewriteRule ^(.*)$ index.html [L]
+</IfModule>
+
+# ── Security Headers ─────────────────────────────────────────────────────────────
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; frame-src https://challenges.cloudflare.com; font-src 'self' data:; frame-ancestors 'none';"
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+    # Remove server fingerprint headers
+    Header always unset X-Powered-By
+    Header always unset Server
+
+    # Prevent MIME type sniffing
+    Header always set X-Download-Options "noopen"
+</IfModule>
+
+# ── PHP hardening ─────────────────────────────────────────────────────────────────
+<IfModule mod_php.c>
+    php_flag display_errors Off
+    php_flag log_errors On
+    php_value error_reporting "32767"
+    php_flag expose_php Off
+    php_flag allow_url_fopen Off
+    php_flag allow_url_include Off
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+    php_value max_execution_time 300
+    php_value memory_limit 256M
+    php_value session.cookie_httponly 1
+    php_value session.cookie_samesite "Lax"
+    php_flag session.use_strict_mode On
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag display_errors Off
+    php_flag log_errors On
+    php_value error_reporting "32767"
+    php_flag expose_php Off
+    php_flag allow_url_fopen Off
+    php_flag allow_url_include Off
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+    php_value max_execution_time 300
+    php_value memory_limit 256M
+    php_value session.cookie_httponly 1
+    php_value session.cookie_samesite "Lax"
+    php_flag session.use_strict_mode On
+</IfModule>
+
+# ── Block dangerous file types ────────────────────────────────────────────────────
+<FilesMatch "\.(env|sql|log|bak|config|dist|fla|psd|ini|sh|bat|git|gitignore|md|json|lock|yaml|yml)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# ── MIME types ────────────────────────────────────────────────────────────────────
+<IfModule mod_mime.c>
+    AddType application/javascript .js
+    AddType text/css .css
+    AddType image/svg+xml .svg
+    AddType font/woff2 .woff2
+</IfModule>
+
+# ── Static asset caching ──────────────────────────────────────────────────────────
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css               "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType image/png              "access plus 1 year"
+    ExpiresByType image/jpeg             "access plus 1 year"
+    ExpiresByType image/svg+xml         "access plus 1 year"
+    ExpiresByType image/x-icon          "access plus 1 year"
+    ExpiresByType font/woff2            "access plus 1 year"
+    ExpiresByType text/html             "access plus 0 seconds"
+</IfModule>
+
+# ── Compression ───────────────────────────────────────────────────────────────────
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css
+    AddOutputFilterByType DEFLATE application/javascript application/json
+    AddOutputFilterByType DEFLATE image/svg+xml font/woff2
+</IfModule>
+
+# ── Prevent hotlinking ────────────────────────────────────────────────────────────
+<IfModule mod_rewrite.c>
+    RewriteCond %{HTTP_REFERER} !^$
+    RewriteCond %{HTTP_REFERER} !^https?://(www\.)?vietool\.cc [NC]
+    RewriteRule \.(gif|jpg|jpeg|png|webp)$ - [F,L]
+</IfModule>
+
+# ── Block bad user agents ─────────────────────────────────────────────────────────
+<IfModule mod_rewrite.c>
+    RewriteCond %{HTTP_USER_AGENT} (harvest|scanner|nikto|sqlmap|nmap|masscan|nessus|acunetix) [NC]
+    RewriteRule .* - [F,L]
+</IfModule>
+
+# ── Request size limiting ─────────────────────────────────────────────────────────
+<IfModule mod_reqtimeout.c>
+    RequestReadTimeout header=20,MinRate=500 body=30,MinRate=500
+</IfModule>

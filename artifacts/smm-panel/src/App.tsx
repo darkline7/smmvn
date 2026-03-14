@@ -5,13 +5,53 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Loader2 } from "lucide-react";
 
+const CHUNK_RELOAD_KEY = "smm_chunk_reload_v1";
+
+// Auto-reload on Vite preload errors (dynamic import failures after deploy)
+if (typeof window !== "undefined") {
+  window.addEventListener("vite:preloadError", () => {
+    try {
+      const already = sessionStorage.getItem(CHUNK_RELOAD_KEY);
+      if (!already) {
+        sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+        window.location.reload();
+      }
+    } catch { /* ignore */ }
+  });
+}
+
+// Detect chunk-loading failures (Vite code-split assets gone after deploy)
+function isChunkLoadError(err: Error) {
+  return (
+    err?.message?.includes("Failed to fetch dynamically imported module") ||
+    err?.message?.includes("Importing a module script failed") ||
+    err?.message?.includes("error loading dynamically imported module") ||
+    (err as any)?.name === "ChunkLoadError"
+  );
+}
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   constructor(props: { children: ReactNode }) {
     super(props);
     this.state = { error: null };
   }
   static getDerivedStateFromError(error: Error) {
+    // Auto-reload once for chunk/module-not-found errors (happens after new deployment)
+    if (isChunkLoadError(error)) {
+      try {
+        const already = sessionStorage.getItem(CHUNK_RELOAD_KEY);
+        if (!already) {
+          sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
+          window.location.reload();
+          return { error: null };
+        }
+      } catch { /* ignore */ }
+    }
     return { error };
+  }
+  componentDidMount() {
+    // Clear the reload flag on successful mount so future errors can reload again
+    try { sessionStorage.removeItem(CHUNK_RELOAD_KEY); } catch { /* ignore */ }
   }
   render() {
     if (this.state.error) {

@@ -42,7 +42,7 @@ router.patch("/", requireAuth as any, async (req: AuthRequest, res: Response) =>
     const { passwordHash, ...safeUser } = updated;
     return res.json(safeUser);
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 

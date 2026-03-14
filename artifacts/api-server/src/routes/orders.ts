@@ -155,7 +155,7 @@ router.post("/", requireAuth as any, async (req: AuthRequest, res: any) => {
       serviceName: service[0].name,
     });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message || "Invalid request" });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 

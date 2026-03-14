@@ -10,12 +10,16 @@ import crypto from "crypto";
 
 const router = Router();
 
-// Helper: load settings map
+// Helper: load settings map — returns empty object on DB error (fail-open for settings)
 async function loadSettings(): Promise<Record<string, string>> {
-  const rows = await db.select().from(siteSettingsTable);
-  const s: Record<string, string> = {};
-  rows.forEach(r => { s[r.key] = r.value || ""; });
-  return s;
+  try {
+    const rows = await db.select().from(siteSettingsTable);
+    const s: Record<string, string> = {};
+    rows.forEach(r => { s[r.key] = r.value || ""; });
+    return s;
+  } catch {
+    return {};
+  }
 }
 
 // Helper: verify Cloudflare Turnstile token
@@ -85,7 +89,7 @@ router.post("/register", authRateLimit, async (req: Request, res: Response) => {
     const { passwordHash, ...safeUser } = user;
     return res.status(201).json({ user: safeUser });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message || "Yêu cầu không hợp lệ" });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 
@@ -117,7 +121,7 @@ router.post("/login", authRateLimit, async (req: Request, res: Response) => {
     const { passwordHash, ...safeUser } = user;
     return res.json({ user: safeUser });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message || "Yêu cầu không hợp lệ" });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 

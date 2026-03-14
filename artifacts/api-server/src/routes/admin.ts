@@ -141,7 +141,7 @@ router.post("/users/:id/balance", async (req: AuthRequest, res: any) => {
     });
     return res.json({ success: true, message: "Balance adjusted" });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 
@@ -234,7 +234,7 @@ router.post("/services", async (req: AuthRequest, res: any) => {
     }).returning();
     return res.status(201).json(service);
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 
@@ -286,7 +286,7 @@ router.post("/categories", async (req: AuthRequest, res: any) => {
     }).returning();
     return res.status(201).json(cat);
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 
@@ -299,7 +299,7 @@ router.post("/categories/reorder", async (req: AuthRequest, res: any) => {
     ));
     return res.json({ ok: true });
   } catch (e: any) {
-    return res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: "Lỗi máy chủ nội bộ" });
   }
 });
 
@@ -347,7 +347,7 @@ router.post("/providers", async (req: AuthRequest, res: any) => {
     const { apiKey: _ak, baseUrl: _bu, ...safe } = provider;
     return res.status(201).json({ ...safe, url });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 
@@ -383,7 +383,7 @@ router.post("/providers/:id/test", async (req: AuthRequest, res: any) => {
     }
     return res.json({ success: false, error: data?.error || "Không nhận được số dư từ provider" });
   } catch (e: any) {
-    return res.json({ success: false, error: e.message });
+    return res.json({ success: false, error: toUserMessage(e) });
   }
 });
 
@@ -457,7 +457,7 @@ async function syncProviderServices(provider: any): Promise<{ added: number; upd
     await db.update(providersTable).set({ lastSyncAt: new Date(), status: "active", updatedAt: new Date() }).where(eq(providersTable.id, provider.id));
     return { added, updated, total: added + updated };
   } catch (e: any) {
-    return { added: 0, updated: 0, total: 0, error: e.message };
+    return { added: 0, updated: 0, total: 0, error: "Sync failed" };
   }
 }
 
@@ -535,7 +535,7 @@ router.post("/payments/:id/approve", async (req: AuthRequest, res: any) => {
     });
     return res.json({ success: true, message: "Deposit approved" });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 
@@ -612,7 +612,7 @@ router.post("/announcements", async (req: AuthRequest, res: any) => {
     const [ann] = await db.insert(announcementsTable).values(req.body).returning();
     return res.status(201).json(ann);
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 
@@ -744,7 +744,7 @@ router.post("/test-telegram", async (req: AuthRequest, res: any) => {
     const result = await sendTelegramMessage(token, chatId, "🧪 *Test Telegram* từ SMM Pro Admin Panel\n\nCấu hình Telegram hoạt động tốt! ✅");
     return res.json({ ok: result, error: result ? null : "Failed to send message" });
   } catch (e: any) {
-    return res.status(500).json({ ok: false, error: e.message });
+    return res.status(500).json({ ok: false, error: "Lỗi máy chủ nội bộ" });
   }
 });
 
@@ -757,7 +757,7 @@ router.post("/test-smtp", async (req: AuthRequest, res: any) => {
     const result = await testSmtp(testEmail);
     return res.json(result);
   } catch (e: any) {
-    return res.status(500).json({ ok: false, error: e.message });
+    return res.status(500).json({ ok: false, error: "Lỗi máy chủ nội bộ" });
   }
 });
 

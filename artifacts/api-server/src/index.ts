@@ -2,6 +2,7 @@ import app from "./app";
 import { db } from "@workspace/db";
 import { usersTable, siteSettingsTable } from "@workspace/db/schema";
 import { hashPassword, generateApiKey, generateReferralCode } from "./lib/auth.js";
+import { runMigrations } from "./lib/migrate.js";
 import { count } from "drizzle-orm";
 
 // Default settings seeded on every startup (onConflictDoNothing = safe to repeat)
@@ -35,6 +36,10 @@ const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: "bank_account_number", value: "" },
   { key: "bank_account_name", value: "" },
   { key: "bank_bin", value: "" },
+  // Thẻ cào - thesieure.com
+  { key: "card_partner_id", value: "" },
+  { key: "card_partner_key", value: "" },
+  { key: "card_enabled", value: "false" },
   // Telegram
   { key: "telegram_bot_token", value: "" },
   { key: "telegram_admin_chat_id", value: "" },
@@ -129,40 +134,64 @@ if (Number.isNaN(port) || port <= 0 || port > 65535) {
 }
 
 if (!rawPort) {
-  console.warn(`[startup] PORT not set — defaulting to ${port}. Set PORT env var in production.`);
+  console.warn(
+    `[startup] PORT not set — defaulting to ${port}. Set PORT env var in production.`
+  );
 }
 
-// ── Start server ───────────────────────────────────────────────────────────────
-const server = app.listen(port, async () => {
-  console.log(`[startup] SMM Panel Pro — listening on port ${port}`);
+// ── Main startup sequence ──────────────────────────────────────────────────────
+async function main() {
+  console.log(`[startup] SMM Panel Pro — Node.js ${process.version}`);
   console.log(`[startup] NODE_ENV=${process.env.NODE_ENV || "development"}`);
-  await ensureSettings();
-  await seedUsersIfEmpty();
-  console.log("[startup] Ready ✓");
-});
 
-// ── Graceful shutdown ──────────────────────────────────────────────────────────
-function shutdown(signal: string) {
-  console.log(`\n[shutdown] Received ${signal} — closing server gracefully...`);
-  server.close(() => {
-    console.log("[shutdown] HTTP server closed. Exiting.");
-    process.exit(0);
-  });
-  // Force exit after 10s if connections don't drain
-  setTimeout(() => {
-    console.error("[shutdown] Forced exit after timeout.");
+  // Step 1: Run DB migrations (creates tables if they don't exist)
+  // This MUST succeed before the server accepts any requests.
+  try {
+    await runMigrations();
+  } catch (err) {
+    console.error("[startup] FATAL: Database migration failed. Check DATABASE_URL and DB connectivity.");
+    console.error(err);
     process.exit(1);
-  }, 10_000).unref();
+  }
+
+  // Step 2: Start HTTP server
+  const server = app.listen(port, async () => {
+    console.log(`[startup] Listening on port ${port}`);
+
+    // Step 3: Seed initial data (safe to run on every start)
+    await ensureSettings();
+    await seedUsersIfEmpty();
+    console.log("[startup] Ready ✓");
+  });
+
+  // ── Graceful shutdown ──────────────────────────────────────────────────────
+  function shutdown(signal: string) {
+    console.log(`\n[shutdown] Received ${signal} — closing gracefully...`);
+    server.close(() => {
+      console.log("[shutdown] HTTP server closed. Exiting.");
+      process.exit(0);
+    });
+    // Force exit after 10s if connections don't drain
+    setTimeout(() => {
+      console.error("[shutdown] Forced exit after timeout.");
+      process.exit(1);
+    }, 10_000).unref();
+  }
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
-
-// Catch unhandled promise rejections — log clearly instead of crashing silently
+// ── Global error handlers ──────────────────────────────────────────────────────
 process.on("unhandledRejection", (reason) => {
   console.error("[error] Unhandled Promise Rejection:", reason);
 });
 process.on("uncaughtException", (err) => {
   console.error("[error] Uncaught Exception:", err);
+  process.exit(1);
+});
+
+main().catch((err) => {
+  console.error("[startup] Fatal startup error:", err);
   process.exit(1);
 });

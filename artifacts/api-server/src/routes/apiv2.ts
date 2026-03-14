@@ -1,3 +1,4 @@
+import { toUserMessage } from "../lib/errors.js";
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, servicesTable, ordersTable, transactionsTable, orderLogsTable, apiRequestLogsTable } from "@workspace/db/schema";
@@ -164,7 +165,7 @@ router.post("/", async (req: Request, res: Response) => {
     }
   } catch (e: any) {
     isError = true;
-    responseData = { error: e.message };
+    responseData = { error: toUserMessage(e) };
   }
 
   await logRequest(user.id, action, { ...body, key: "***" }, responseData, isError ? "error" : "success", ip);

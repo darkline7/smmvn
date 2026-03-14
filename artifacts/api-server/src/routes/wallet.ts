@@ -56,7 +56,7 @@ router.post("/deposits", requireAuth as any, async (req: AuthRequest, res: any) 
     }).returning();
     return res.status(201).json(deposit);
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 
@@ -191,7 +191,7 @@ router.post("/cards", requireAuth as any, async (req: AuthRequest, res: any) => 
     const statusLabels: Record<number, string> = { 1: "Thành công", 2: "Đang xử lý", 3: "Thẻ lỗi / không hợp lệ", 99: "Hệ thống đang bảo trì" };
     return res.json({ id: charge.id, status: cardStatus, message: statusLabels[cardStatus] || cardMessage, usdCredited });
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 

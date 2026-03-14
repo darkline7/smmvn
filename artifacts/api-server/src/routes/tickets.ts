@@ -46,7 +46,7 @@ router.post("/", requireAuth as any, async (req: AuthRequest, res: any) => {
     
     return res.status(201).json(ticket);
   } catch (e: any) {
-    return res.status(400).json({ error: e.message });
+    return res.status(400).json({ error: toUserMessage(e) });
   }
 });
 

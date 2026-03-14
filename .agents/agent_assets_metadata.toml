@@ -12,3 +12,9 @@ id = "mo7xcFWSSR7ORupUoMWbQ"
 uri = "file://SECURITY_AUDIT_REPORT.md"
 type = "text"
 title = "Báo Cáo Kiểm Tra Bảo Mật — SMM Panel Pro"
+
+[[outputs]]
+id = "9wdXtNZ9WQxvy4ZlpsCT0"
+uri = "file://smm-panel-pro-source.tar.gz"
+type = "unspecified"
+title = "SMM Panel Pro — Mã Nguồn"

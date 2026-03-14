@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "DCDlmUq2Q61Rj_sbKm5oV"
+uri = "file://HUONG_DAN_DEPLOY_CPANEL.md"
+type = "text"
+title = "Hướng dẫn Deploy SMM Panel lên cPanel"

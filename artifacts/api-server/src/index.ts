@@ -4,7 +4,7 @@ import { usersTable, siteSettingsTable } from "@workspace/db/schema";
 import { hashPassword, generateApiKey, generateReferralCode } from "./lib/auth.js";
 import { count } from "drizzle-orm";
 
-// Default settings always ensured on startup (upsert logic via onConflictDoNothing)
+// Default settings seeded on every startup (onConflictDoNothing = safe to repeat)
 const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   // General
   { key: "site_name", value: "SMM Pro" },
@@ -50,7 +50,7 @@ const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   { key: "smtp_from_name", value: "SMM Pro" },
   { key: "smtp_from_email", value: "" },
   { key: "smtp_enabled", value: "false" },
-  // Security
+  // Security / OAuth
   { key: "google_client_id", value: "" },
   { key: "google_client_secret", value: "" },
   { key: "google_oauth_enabled", value: "false" },
@@ -69,19 +69,22 @@ async function ensureSettings() {
       await db.insert(siteSettingsTable).values(s).onConflictDoNothing();
     }
   } catch (err) {
-    console.error("Settings seed error:", err);
+    console.error("[startup] Settings seed error:", err);
   }
 }
 
 async function seedUsersIfEmpty() {
   try {
-    const [{ value: userCount }] = await db.select({ value: count() }).from(usersTable);
+    const [{ value: userCount }] = await db
+      .select({ value: count() })
+      .from(usersTable);
     if (Number(userCount) > 0) return;
 
-    console.log("No users found — seeding initial users...");
+    console.log("[startup] No users found — seeding default admin + demo accounts...");
 
     const adminHash = await hashPassword("password");
     const demoHash = await hashPassword("password");
+
     await db.insert(usersTable).values([
       {
         email: "admin@smmpanel.com",
@@ -107,28 +110,59 @@ async function seedUsersIfEmpty() {
       },
     ]);
 
-    console.log("Seed complete: admin@smmpanel.com / password");
+    console.log("[startup] Seed complete: admin@smmpanel.com / password");
+    console.log("[startup] IMPORTANT: Change admin password immediately after first login!");
   } catch (err) {
-    console.error("User seed error:", err);
+    console.error("[startup] User seed error:", err);
   }
 }
 
+// ── Port resolution ────────────────────────────────────────────────────────────
+// cPanel Node.js Selector sets PORT automatically.
+// Provide a safe fallback of 3000 for local/direct node execution.
 const rawPort = process.env["PORT"];
+const port = rawPort ? Number(rawPort) : 3000;
+
+if (Number.isNaN(port) || port <= 0 || port > 65535) {
+  console.error(`[startup] Invalid PORT value: "${rawPort}" — must be 1-65535`);
+  process.exit(1);
+}
 
 if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
+  console.warn(`[startup] PORT not set — defaulting to ${port}. Set PORT env var in production.`);
 }
 
-const port = Number(rawPort);
+// ── Start server ───────────────────────────────────────────────────────────────
+const server = app.listen(port, async () => {
+  console.log(`[startup] SMM Panel Pro — listening on port ${port}`);
+  console.log(`[startup] NODE_ENV=${process.env.NODE_ENV || "development"}`);
+  await ensureSettings();
+  await seedUsersIfEmpty();
+  console.log("[startup] Ready ✓");
+});
 
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
+// ── Graceful shutdown ──────────────────────────────────────────────────────────
+function shutdown(signal: string) {
+  console.log(`\n[shutdown] Received ${signal} — closing server gracefully...`);
+  server.close(() => {
+    console.log("[shutdown] HTTP server closed. Exiting.");
+    process.exit(0);
+  });
+  // Force exit after 10s if connections don't drain
+  setTimeout(() => {
+    console.error("[shutdown] Forced exit after timeout.");
+    process.exit(1);
+  }, 10_000).unref();
 }
 
-app.listen(port, async () => {
-  console.log(`Server listening on port ${port}`);
-  await ensureSettings();  // Always run — adds missing settings
-  await seedUsersIfEmpty(); // Only runs on fresh DB
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
+// Catch unhandled promise rejections — log clearly instead of crashing silently
+process.on("unhandledRejection", (reason) => {
+  console.error("[error] Unhandled Promise Rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[error] Uncaught Exception:", err);
+  process.exit(1);
 });

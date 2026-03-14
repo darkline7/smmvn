@@ -35,7 +35,7 @@ title = "Hướng Dẫn Deploy VPS (Node.js + Nginx + PM2)"
 id = "Vg6UU6QCGKfYlurdLoEpg"
 uri = "file://smm-panel-cpanel.tar.gz"
 type = "unspecified"
-title = "smm-panel-cpanel.tar.gz (2.3MB — Upload lên cPanel)"
+title = "smm-panel-cpanel.tar.gz — Production Build (2.3MB)"
 
 [[outputs]]
 id = "khg0F0yyPYOyluXova7vv"

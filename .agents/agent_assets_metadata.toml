@@ -18,3 +18,15 @@ id = "9wdXtNZ9WQxvy4ZlpsCT0"
 uri = "file://smm-panel-pro-source.tar.gz"
 type = "unspecified"
 title = "SMM Panel Pro — Mã Nguồn"
+
+[[outputs]]
+id = "ld-QqxpF4Ohvg1hBxvBuc"
+uri = "file://smm-panel-pro-FULL.tar.gz"
+type = "unspecified"
+title = "SMM Panel Pro — Mã Nguồn Đầy Đủ (3.7MB · 418 files)"
+
+[[outputs]]
+id = "cMvGyDv-nkJFrhzAsQDz0"
+uri = "file://HUONG_DAN_DEPLOY_VPS.md"
+type = "text"
+title = "Hướng Dẫn Deploy VPS (Node.js + Nginx + PM2)"

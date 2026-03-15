@@ -79,7 +79,7 @@ router.post("/notifications/read-all", requireAuth as any, async (req: AuthReque
 router.get("/referrals", requireAuth as any, async (req: AuthRequest, res: any) => {
   const user = await db.select({ referralCode: usersTable.referralCode }).from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1);
   const referralCode = user[0]?.referralCode || "";
-  const referralLink = `${process.env.SITE_URL || "https://smmvn.replit.app"}/register?ref=${referralCode}`;
+  const referralLink = `${process.env.SITE_URL || "https://vietool.cc"}/register?ref=${referralCode}`;
   
   const history = await db.select({
     userId: referralsTable.referredUserId,

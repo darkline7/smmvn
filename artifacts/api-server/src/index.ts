@@ -9,11 +9,11 @@ import { count } from "drizzle-orm";
 const DEFAULT_SETTINGS: { key: string; value: string }[] = [
   // General
   { key: "site_name", value: "SMM Pro" },
-  { key: "site_url", value: "https://smmvn.replit.app" },
+  { key: "site_url", value: "https://vietool.cc" },
   { key: "site_description", value: "The #1 Premium Social Media Panel" },
   { key: "site_keywords", value: "smm panel, social media marketing, instagram followers" },
   { key: "site_author", value: "SMM Pro" },
-  { key: "support_email", value: "support@smmvn.replit.app" },
+  { key: "support_email", value: "support@vietool.cc" },
   { key: "hotline", value: "" },
   { key: "address", value: "" },
   { key: "fanpage_url", value: "" },

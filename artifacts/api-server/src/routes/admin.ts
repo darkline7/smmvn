@@ -670,6 +670,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   "telegram_bot_token", "telegram_admin_chat_id",
   "card_partner_id", "card_partner_key",
   "sepay_webhook_secret", "sepay_account_number",
+  "thueapibank_signature", "thueapibank_enabled",
   "google_client_id", "google_client_secret",
   "smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from",
   "turnstile_site_key", "turnstile_secret_key",

@@ -1,0 +1,79 @@
+Signature
+280ac38e79ba96d69e473e0242d4148f
+Mẫu dữ liệu sẽ nhận được khi có phát sinh giao dịch
+        {
+            "status": "success",
+            "message": "Thành công",
+            "transactions": [
+                {
+                    "type": "IN", //Loại giao dịch
+                    "transactionID": "24213", //Mã giao dịch từ phía ngân hàng
+                    "amount": "100000", // số tiền giao dịch
+                    "description": "NAP14838 GD 941234-010624 16:56:30" // nội dung giao dịch
+                },
+                {
+                    "type": "IN",
+                    "transactionID": "24212",
+                    "amount": "300000",
+                    "description": "IB NAP1531"
+                },
+                {
+                    "type": "IN",
+                    "transactionID": "24211",
+                    "amount": "300000",
+                    "description": "NAP14076 GD 063532-010624 16:31:49"
+                }
+            ]
+        }
+                    
+Quy định sử dụng
+- Khi phát sinh giao dịch hệ thống sẽ gửi đến URL webhook thông tin của giao dịch đó (mẫu như trên), nếu webhook không phản hồi (timeout), hoặc không trả về mã 200 hệ thống sẽ tự động gọi lại sau 1 phút
+- Khi hệ thống gọi lại 10 lần không thành công thì giao dịch sẽ bị hủy bỏ.
+
+Code PHP mẫu webhook nhận dữ liệu từ hệ thống
+1
+        header('Content-Type: application/json; charset=utf-8'); 
+2
+        $Signature = 'igoZrwnTySdOALtqQjDRWkHUFVpflhcBJuvNbmIeKxaCGzYPMEXs'; // thay bằng Signature thực tế được hệ thống cấp
+3
+        $receivedData = file_get_contents('php://input'); 
+4
+        $header = getallheaders();
+5
+        
+6
+        
+7
+        if (isset($header['signature']) && $header['signature'] === $Signature) {
+8
+        
+9
+            $result = json_decode($receivedData, true);
+10
+            foreach ($result["transactions"] as $data) {
+11
+                $tid = $data["transactionID"];
+12
+                $description = $data["description"];
+13
+                $amount = $data["amount"];
+14
+                $type = $data["type"]; 
+15
+            }
+16
+        
+17
+            $response = ["status" => true, "msg" => "OK"];
+18
+            echo json_encode($response);
+19
+        
+20
+        } else {
+21
+            
+22
+            http_response_code(401);
+23
+            echo 'Chữ ký không hợp lệ.';

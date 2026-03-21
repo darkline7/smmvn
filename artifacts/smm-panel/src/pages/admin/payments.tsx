@@ -1,156 +1,307 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 import { useAdminListDeposits } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { CreditCard, CheckCircle2, XCircle, Clock, RefreshCw, Search, DollarSign } from "lucide-react";
+import {
+  CreditCard, RefreshCw, Search, DollarSign, Copy, Check,
+  CheckCircle2, XCircle, Clock, Webhook, ExternalLink, Save,
+} from "lucide-react";
+
+const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
+
+const METHOD_LABELS: Record<string, string> = {
+  bank_transfer: "Chuyển khoản ngân hàng",
+  qr_payment: "Quét mã QR",
+  crypto: "Tiền điện tử",
+  sepay: "SePay",
+  thueapibank: "ThueApiBank",
+  card: "Thẻ cào",
+  manual: "Thủ công",
+};
 
 const statusColors: Record<string, string> = {
   pending:  "bg-yellow-100 text-yellow-700 border-yellow-200",
   approved: "bg-green-100 text-green-700 border-green-200",
   rejected: "bg-red-100 text-red-700 border-red-200",
 };
-const statusLabels: Record<string, string> = { pending: "Chờ duyệt", approved: "Đã duyệt", rejected: "Từ chối" };
+const statusLabels: Record<string, string> = {
+  pending: "Chờ xử lý",
+  approved: "Đã duyệt",
+  rejected: "Từ chối",
+};
+const StatusIcon = ({ status }: { status: string }) => {
+  if (status === "approved") return <CheckCircle2 className="w-4 h-4 text-green-600" />;
+  if (status === "rejected") return <XCircle className="w-4 h-4 text-red-600" />;
+  return <Clock className="w-4 h-4 text-yellow-600" />;
+};
 
-function DepositActionDialog({ deposit, onDone }: { deposit: any; onDone: () => void }) {
-  const { toast } = useToast();
-  const [adminNote, setAdminNote] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const action = async (status: "approved" | "rejected") => {
-    setLoading(true);
-    try {
-      const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
-      const res = await fetch(`${BASE}/api/admin/deposits/${deposit.id}/${status}`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        credentials: "include", body: JSON.stringify({ adminNote }),
-      });
-      if (!res.ok) throw new Error();
-      toast({ title: `${status === "approved" ? "✅ Đã duyệt" : "❌ Đã từ chối"} nạp tiền #${deposit.id}` });
-      onDone();
-    } catch {
-      toast({ title: "Lỗi xử lý", variant: "destructive" });
-    } finally { setLoading(false); }
+// ─── Copy button ──────────────────────────────────────────────────────────────
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   };
-
   return (
-    <DialogContent className="max-w-md">
-      <DialogHeader><DialogTitle>Xử lý nạp tiền #{deposit.id}</DialogTitle></DialogHeader>
-      <div className="space-y-4">
-        <div className="p-4 rounded-xl bg-muted space-y-2 text-sm">
-          <div className="flex justify-between"><span className="text-muted-foreground">User ID</span><span className="font-medium">#{deposit.userId}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Số tiền</span><span className="font-bold text-primary text-lg">{formatCurrency(Number(deposit.amount))}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Phương thức</span><span>{deposit.method}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Ngày tạo</span><span>{format(new Date(deposit.createdAt), "dd/MM/yyyy HH:mm")}</span></div>
-          {deposit.note && <div className="flex justify-between"><span className="text-muted-foreground">Ghi chú</span><span className="text-right max-w-[200px]">{deposit.note}</span></div>}
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium">Ghi chú admin (tùy chọn)</label>
-          <Textarea value={adminNote} onChange={e => setAdminNote(e.target.value)} placeholder="Lý do duyệt / từ chối..." rows={2} />
-        </div>
-        <div className="flex gap-3">
-          <Button className="flex-1 gap-2 bg-green-600 hover:bg-green-700" disabled={loading} onClick={() => action("approved")}>
-            <CheckCircle2 className="w-4 h-4" />Duyệt
-          </Button>
-          <Button variant="destructive" className="flex-1 gap-2" disabled={loading} onClick={() => action("rejected")}>
-            <XCircle className="w-4 h-4" />Từ chối
-          </Button>
-        </div>
-      </div>
-    </DialogContent>
+    <button onClick={copy} className="p-1.5 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground flex-shrink-0" title="Sao chép">
+      {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+    </button>
   );
 }
 
-export default function AdminPayments() {
-  const [statusFilter, setStatusFilter] = useState("pending");
-  const [search, setSearch] = useState("");
-  const [selectedDeposit, setSelectedDeposit] = useState<any>(null);
-  const { data, isLoading, refetch } = useAdminListDeposits({ status: statusFilter !== "all" ? statusFilter : undefined, limit: 50 });
-  const deposits = (data?.deposits || []).filter((d: any) => !search || d.userId.toString().includes(search));
+// ─── ThueApiBank Webhook settings card ───────────────────────────────────────
+function ThueApiBankSettings() {
+  const { toast } = useToast();
+  const [signature, setSignature] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const pendingCount = data?.deposits?.filter((d: any) => d.status === "pending").length || 0;
+  const siteUrl = (() => {
+    try { return window.location.origin; } catch { return "https://vietool.cc"; }
+  })();
+  const webhookUrl = `${siteUrl}${BASE}/api/webhooks/thueapibank`;
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${BASE}/api/admin/settings`, { credentials: "include" })
+      .then(r => r.json())
+      .then(s => { setSignature(s.thueapibank_signature || ""); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`${BASE}/api/admin/settings`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ thueapibank_signature: signature }),
+      });
+      if (!res.ok) throw new Error();
+      toast({ title: "Đã lưu Signature ThueApiBank" });
+    } catch {
+      toast({ title: "Lỗi lưu cài đặt", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card className="border-border/50 shadow-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Webhook className="w-4 h-4 text-primary" />
+          Webhook — API Bank (thueapibank.vn)
+          <a href="https://thueapibank.vn" target="_blank" rel="noopener noreferrer" className="ml-auto">
+            <Button variant="ghost" size="sm" className="gap-1 text-xs h-7">
+              <ExternalLink className="w-3 h-3" />thueapibank.vn
+            </Button>
+          </a>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Callback Webhook URL */}
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Callback Webhook URL</label>
+          <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2 border">
+            <code className="text-xs font-mono flex-1 break-all">{webhookUrl}</code>
+            <CopyButton text={webhookUrl} />
+          </div>
+          <p className="text-xs text-muted-foreground">Dán URL này vào phần cài đặt webhook trên trang thueapibank.vn</p>
+        </div>
+
+        {/* Signature */}
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Signature (từ thueapibank.vn)</label>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Nhập signature được cấp bởi thueapibank.vn..."
+              value={signature}
+              onChange={e => setSignature(e.target.value)}
+              disabled={loading}
+              className="font-mono text-sm"
+            />
+            <Button onClick={save} disabled={saving || !signature} className="gap-1.5 flex-shrink-0">
+              <Save className="w-3.5 h-3.5" />
+              {saving ? "Đang lưu..." : "Lưu"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Signature dùng để xác thực header <code className="bg-muted px-1 rounded">signature</code> từ thueapibank.vn
+          </p>
+        </div>
+
+        {/* Data format */}
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Định dạng dữ liệu nhận được</label>
+          <pre className="text-xs bg-muted/60 rounded-lg p-3 overflow-x-auto border font-mono leading-relaxed">{`{
+  "status": "success",
+  "transactions": [
+    {
+      "type": "IN",
+      "transactionID": "24213",
+      "amount": "100000",
+      "description": "SMM{depositId}"
+    }
+  ]
+}`}</pre>
+          <p className="text-xs text-muted-foreground">
+            Người dùng cần ghi nội dung chuyển khoản là <code className="bg-muted px-1 rounded">SMM{"{"}depositId{"}"}</code> để hệ thống tự động cộng tiền.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+export default function AdminPayments() {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const { data, isLoading, refetch } = useAdminListDeposits({ limit: 100 });
+
+  const allDeposits: any[] = data?.deposits || [];
+
+  const deposits = allDeposits.filter((d: any) => {
+    if (statusFilter !== "all" && d.status !== statusFilter) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      return (
+        String(d.userId).includes(q) ||
+        String(d.id).includes(q) ||
+        (d.method || "").toLowerCase().includes(q) ||
+        (d.note || "").toLowerCase().includes(q) ||
+        (d.adminNote || "").toLowerCase().includes(q)
+      );
+    }
+    return true;
+  });
+
+  const stats = {
+    total: allDeposits.length,
+    approved: allDeposits.filter((d: any) => d.status === "approved").length,
+    pending: allDeposits.filter((d: any) => d.status === "pending").length,
+    rejected: allDeposits.filter((d: any) => d.status === "rejected").length,
+  };
 
   return (
     <DashboardLayout isAdminLayout>
       <div className="space-y-6 pb-8 animate-in fade-in duration-500">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold font-display">Quản lý nạp tiền</h2>
-            {pendingCount > 0 && <p className="text-orange-600 font-medium mt-1">⚠️ {pendingCount} yêu cầu chờ duyệt</p>}
+            <p className="text-muted-foreground mt-1">Lịch sử giao dịch nạp tiền · Tự động xử lý qua webhook</p>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => refetch()}><RefreshCw className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => refetch()}>
+            <RefreshCw className="w-4 h-4" />
+          </Button>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: "Chờ duyệt", status: "pending", color: "text-yellow-600", bg: "bg-yellow-50" },
-            { label: "Đã duyệt", status: "approved", color: "text-green-600", bg: "bg-green-50" },
-            { label: "Từ chối", status: "rejected", color: "text-red-600", bg: "bg-red-50" },
-          ].map(({ label, status, color, bg }) => (
-            <button key={status} onClick={() => setStatusFilter(status)}
-              className={`p-4 rounded-xl border text-left transition-all ${statusFilter === status ? "border-primary ring-1 ring-primary" : "border-border hover:border-primary/50"} ${statusFilter === status ? bg : ""}`}>
-              <p className={`text-2xl font-bold ${color}`}>{data?.deposits?.filter((d: any) => d.status === status).length || 0}</p>
-              <p className="text-sm text-muted-foreground mt-1">{label}</p>
+            { label: "Tất cả", value: stats.total, status: "all", color: "text-foreground", bg: "bg-muted/60" },
+            { label: "Đã duyệt", value: stats.approved, status: "approved", color: "text-green-600", bg: "bg-green-50" },
+            { label: "Chờ xử lý", value: stats.pending, status: "pending", color: "text-yellow-600", bg: "bg-yellow-50" },
+            { label: "Từ chối", value: stats.rejected, status: "rejected", color: "text-red-600", bg: "bg-red-50" },
+          ].map(({ label, value, status, color, bg }) => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`p-4 rounded-xl border text-left transition-all ${statusFilter === status ? "border-primary ring-1 ring-primary" : "border-border hover:border-primary/40"} ${statusFilter === status ? bg : ""}`}
+            >
+              <p className={`text-2xl font-bold ${color}`}>{value}</p>
+              <p className="text-xs text-muted-foreground mt-1">{label}</p>
             </button>
           ))}
         </div>
 
-        <div className="flex gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input placeholder="Tìm theo User ID..." className="pl-9" value={search} onChange={e => setSearch(e.target.value)} />
-          </div>
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Tìm theo User ID, mã nạp, phương thức..."
+            className="pl-9"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
         </div>
 
-        <Dialog>
-          <Card className="border-border/50 shadow-sm">
-            <CardContent className="p-0">
-              {isLoading ? (
-                <div className="p-6 space-y-3">{[1,2,3].map(i => <div key={i} className="h-16 bg-muted animate-pulse rounded-xl"></div>)}</div>
-              ) : !deposits.length ? (
-                <div className="text-center py-16 text-muted-foreground">
-                  <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p>Không có yêu cầu nào</p>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {deposits.map((d: any) => (
-                    <div key={d.id} className="flex items-center justify-between p-4 hover:bg-muted/20">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${d.status === "approved" ? "bg-green-100" : d.status === "rejected" ? "bg-red-100" : "bg-yellow-100"}`}>
-                          <DollarSign className={`w-5 h-5 ${d.status === "approved" ? "text-green-600" : d.status === "rejected" ? "text-red-600" : "text-yellow-600"}`} />
-                        </div>
-                        <div>
-                          <p className="font-medium">User #{d.userId} · #{d.id}</p>
-                          <p className="text-xs text-muted-foreground">{format(new Date(d.createdAt), "dd/MM/yyyy HH:mm")} · {d.method}</p>
-                          {d.adminNote && <p className="text-xs text-muted-foreground mt-0.5 italic">{d.adminNote}</p>}
-                        </div>
+        {/* Transaction list */}
+        <Card className="border-border/50 shadow-sm">
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="p-6 space-y-3">
+                {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-muted animate-pulse rounded-xl" />)}
+              </div>
+            ) : !deposits.length ? (
+              <div className="text-center py-16 text-muted-foreground">
+                <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>Không có giao dịch nào</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border/40">
+                {deposits.map((d: any) => (
+                  <div key={d.id} className="flex items-start gap-3 p-4 hover:bg-muted/20 transition-colors">
+                    {/* Icon */}
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${d.status === "approved" ? "bg-green-100" : d.status === "rejected" ? "bg-red-100" : "bg-yellow-100"}`}>
+                      <DollarSign className={`w-5 h-5 ${d.status === "approved" ? "text-green-600" : d.status === "rejected" ? "text-red-600" : "text-yellow-600"}`} />
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-sm">#{d.id}</span>
+                        <span className="text-muted-foreground text-sm">User #{d.userId}</span>
+                        <Badge variant="outline" className={`text-xs px-2 py-0 ${statusColors[d.status]}`}>
+                          <StatusIcon status={d.status} />
+                          <span className="ml-1">{statusLabels[d.status]}</span>
+                        </Badge>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="font-bold text-lg">{formatCurrency(Number(d.amount))}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${statusColors[d.status]}`}>{statusLabels[d.status]}</span>
-                        </div>
-                        {d.status === "pending" && (
-                          <DialogTrigger asChild>
-                            <Button size="sm" onClick={() => setSelectedDeposit(d)}>Xử lý</Button>
-                          </DialogTrigger>
+                      <div className="text-xs text-muted-foreground space-y-0.5">
+                        <p>{format(new Date(d.createdAt), "dd/MM/yyyy HH:mm:ss")}</p>
+                        <p className="font-medium text-foreground/70">
+                          {METHOD_LABELS[d.method] || d.method}
+                        </p>
+                        {d.note && (
+                          <p className="break-words whitespace-pre-wrap text-foreground/60">{d.note}</p>
+                        )}
+                        {d.adminNote && (
+                          <p className="break-words whitespace-pre-wrap italic text-muted-foreground">{d.adminNote}</p>
                         )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          {selectedDeposit && <DepositActionDialog deposit={selectedDeposit} onDone={() => { refetch(); setSelectedDeposit(null); }} />}
-        </Dialog>
+
+                    {/* Amount */}
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-bold text-base text-primary">
+                        {formatCurrency(Number(d.amount))}
+                      </p>
+                      {d.amountVnd && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {Number(d.amountVnd).toLocaleString("vi-VN")}đ
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* ThueApiBank Webhook Settings */}
+        <ThueApiBankSettings />
       </div>
     </DashboardLayout>
   );

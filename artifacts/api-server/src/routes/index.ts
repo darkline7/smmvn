@@ -11,6 +11,7 @@ import miscRouter from "./misc.js";
 import adminRouter from "./admin.js";
 import apiv2Router from "./apiv2.js";
 import sepayRouter from "./sepay.js";
+import thueapibankRouter from "./thueapibank.js";
 import subdomainsRouter from "./subdomains.js";
 import { apiv2RateLimit } from "../lib/rate-limits.js";
 
@@ -28,6 +29,7 @@ router.use("/", miscRouter);
 router.use("/admin", adminRouter);
 router.use("/v2", apiv2RateLimit, apiv2Router);
 router.use("/webhooks", sepayRouter);
+router.use("/webhooks", thueapibankRouter);
 router.use("/subdomains", subdomainsRouter);
 
 export default router;

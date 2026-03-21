@@ -195,7 +195,7 @@ export default function AdminSettings() {
 
   const GENERAL_KEYS = ["site_name","site_description","site_keywords","site_author","support_email","hotline","address","fanpage_url","timezone","copyright_left","copyright_right","vnd_exchange_rate","referral_commission"];
   const BRANDING_KEYS = ["logo_url","favicon_url"];
-  const BANK_KEYS = ["bank_name","bank_account_number","bank_account_name","bank_bin","sepay_webhook_secret","sepay_enabled","min_deposit","max_deposit","card_partner_id","card_partner_key"];
+  const BANK_KEYS = ["bank_name","bank_account_number","bank_account_name","bank_bin","sepay_webhook_secret","sepay_enabled","min_deposit","max_deposit","card_partner_id","card_partner_key","gachthefast_partner_id","gachthefast_partner_key","gachthefast_enabled"];
   const TELEGRAM_KEYS = ["telegram_bot_token","telegram_admin_chat_id","telegram_notify_new_order","telegram_notify_new_deposit","telegram_notify_new_ticket"];
   const SMTP_KEYS = ["smtp_host","smtp_port","smtp_secure","smtp_user","smtp_pass","smtp_from_name","smtp_from_email","smtp_enabled"];
   const SECURITY_KEYS = ["google_client_id","google_client_secret","google_oauth_enabled","turnstile_site_key","turnstile_secret_key","turnstile_enabled"];
@@ -334,6 +334,31 @@ export default function AdminSettings() {
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                   </button>
                 </div>
+              </div>
+            </SettingsSection>
+            <SettingsSection title="GachTheFast - Kiểm tra lịch sử nhận tiền" icon={<span className="text-base">🏦</span>}>
+              <p className="text-xs text-muted-foreground">
+                Tự động duyệt nạp tiền chuyển khoản bằng cách polling lịch sử giao dịch từ{" "}
+                <a href="https://gachthefast.com" target="_blank" rel="noopener noreferrer" className="underline text-primary">gachthefast.com</a>.
+                Chữ ký: <code className="bg-muted px-1 rounded text-xs">md5(partner_key + partner_id)</code>.
+                Lưu ý mã chuyển khoản phải chứa <code className="bg-muted px-1 rounded text-xs">SMM{"{id}"}</code>.
+              </p>
+              <div className="flex items-center gap-3">
+                <Switch checked={form.gachthefast_enabled === "true"} onCheckedChange={() => toggle("gachthefast_enabled")} id="gachthefast_enabled" />
+                <Label htmlFor="gachthefast_enabled" className="text-green-600 font-medium">Bật tự động duyệt qua GachTheFast</Label>
+              </div>
+              <Field label="Partner ID" id="gachthefast_partner_id" value={form.gachthefast_partner_id || ""} onChange={set("gachthefast_partner_id")} placeholder="Partner ID từ gachthefast.com" />
+              <Field label="Partner Key" id="gachthefast_partner_key" value={form.gachthefast_partner_key || ""} onChange={set("gachthefast_partner_key")} sensitive placeholder="Partner Key từ gachthefast.com" />
+              <div className="space-y-1">
+                <p className="text-xs font-medium">Cron URL (gọi định kỳ mỗi 1–5 phút):</p>
+                <div className="flex items-center gap-2 bg-muted border rounded px-3 py-2 font-mono text-xs break-all">
+                  <span className="flex-1 select-all">{`${window.location.origin}/api/cron/gachthefast-check?secret=YOUR_CRON_SECRET`}</span>
+                  <button type="button" className="shrink-0 hover:text-primary transition-colors"
+                    onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/cron/gachthefast-check?secret=YOUR_CRON_SECRET`)}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">Thay <code className="bg-muted px-1 rounded">YOUR_CRON_SECRET</code> bằng giá trị Cron Secret trong tab Hệ thống.</p>
               </div>
             </SettingsSection>
             <Button onClick={() => save(BANK_KEYS)} disabled={saving} className="gap-2">

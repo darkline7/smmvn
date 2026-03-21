@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { announcementsTable, notificationsTable, referralsTable, usersTable, siteSettingsTable, providersTable, servicesTable, categoriesTable, ordersTable, orderLogsTable } from "@workspace/db/schema";
+import { announcementsTable, notificationsTable, referralsTable, usersTable, siteSettingsTable, providersTable, servicesTable, categoriesTable, ordersTable, orderLogsTable, depositsTable, transactionsTable } from "@workspace/db/schema";
 import { eq, desc, sql, and, inArray, isNotNull } from "drizzle-orm";
 import { requireAuth, requireAdmin } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
+import crypto from "crypto";
+import { notifyAutoDepositApproved } from "../lib/telegram.js";
 
 const router = Router();
 
@@ -346,6 +348,146 @@ router.get("/cron/update-orders", async (req, res) => {
     }
 
     return res.json({ success: true, checked: pendingOrders.length, updated, timestamp: new Date().toISOString() });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/cron/gachthefast-check?secret=xxx
+// Polls gachthefast.com history-receive API and auto-approves matched pending deposits.
+// sign = md5(partner_key + partner_id)  per gachthefast API spec
+router.get("/cron/gachthefast-check", async (req, res) => {
+  try {
+    const settings = await getSettings();
+    const cronSecret = settings["cron_secret"] || "";
+    if (!verifyCronSecret(req.query.secret, cronSecret)) {
+      return res.status(401).json({ error: "Invalid cron secret" });
+    }
+
+    if (settings["gachthefast_enabled"] !== "true") {
+      return res.status(400).json({ error: "GachTheFast bank polling chưa được bật" });
+    }
+
+    const partnerId = settings["gachthefast_partner_id"] || "";
+    const partnerKey = settings["gachthefast_partner_key"] || "";
+    if (!partnerId || !partnerKey) {
+      return res.status(400).json({ error: "Chưa cấu hình GachTheFast Partner ID / Key" });
+    }
+
+    const sign = crypto.createHash("md5").update(partnerKey + partnerId).digest("hex");
+    const limit = Math.min(1000, Math.max(1, Number(req.query.limit) || 100));
+
+    let apiData: any;
+    try {
+      const body = new URLSearchParams({ partner_id: partnerId, sign, limit: String(limit) });
+      const resp = await fetch("https://gachthefast.com/client/api/wallet/history-receive", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+        signal: AbortSignal.timeout(30000),
+      });
+      apiData = await resp.json();
+    } catch (fetchErr: any) {
+      return res.status(502).json({ error: `Không thể kết nối gachthefast.com: ${fetchErr.message}` });
+    }
+
+    if (apiData?.status !== "success") {
+      return res.status(400).json({ error: apiData?.message || "Lỗi từ gachthefast.com", raw: apiData });
+    }
+
+    const transactions: any[] = Array.isArray(apiData.data) ? apiData.data : [];
+    const exchangeRate = Number(settings["vnd_exchange_rate"] || "24000");
+    const processed: string[] = [];
+    const errors: string[] = [];
+
+    for (const tx of transactions) {
+      try {
+        const message = String(tx.message || "").toUpperCase();
+        const txAmount = Number(tx.pay_amount || 0);
+        const orderCode = String(tx.order_code || "");
+
+        if (txAmount <= 0) continue;
+
+        const match = message.match(/SMM(\d+)/) || message.match(/NAP(\d+)/);
+        if (!match) {
+          console.log(`[GachTheFast] Bỏ qua — không có mã tham chiếu: "${tx.message}" (${orderCode})`);
+          continue;
+        }
+
+        const depositId = parseInt(match[1], 10);
+        const [deposit] = await db.select().from(depositsTable).where(
+          and(eq(depositsTable.id, depositId), eq(depositsTable.status, "pending"))
+        ).limit(1);
+
+        if (!deposit) {
+          console.log(`[GachTheFast] Deposit #${depositId} không tìm thấy hoặc đã xử lý`);
+          continue;
+        }
+
+        const [user] = await db.select().from(usersTable).where(eq(usersTable.id, deposit.userId)).limit(1);
+        if (!user) { errors.push(`User không tồn tại cho deposit #${depositId}`); continue; }
+
+        const depositAmountUSD = Number(deposit.amount);
+        const receivedUSD = txAmount / exchangeRate;
+
+        if (Math.abs(receivedUSD - depositAmountUSD) > depositAmountUSD * 0.05) {
+          console.warn(`[GachTheFast] Số tiền không khớp #${depositId}: kỳ vọng ${depositAmountUSD}, nhận ${receivedUSD.toFixed(2)}`);
+          errors.push(`Số tiền không khớp #${depositId}`);
+          continue;
+        }
+
+        const newBalance = Number(user.balance) + depositAmountUSD;
+
+        await db.transaction(async (trx) => {
+          await trx.update(depositsTable).set({
+            status: "approved",
+            adminNote: `Auto-approved by GachTheFast. Nhận ${txAmount} VND (Order: ${orderCode})`,
+            updatedAt: new Date(),
+          }).where(eq(depositsTable.id, deposit.id));
+
+          await trx.update(usersTable)
+            .set({ balance: newBalance.toFixed(4) })
+            .where(eq(usersTable.id, user.id));
+
+          await trx.insert(transactionsTable).values({
+            userId: user.id,
+            type: "deposit",
+            amount: deposit.amount,
+            balanceAfter: newBalance.toFixed(4),
+            description: `Nạp tiền qua GachTheFast - ${tx.message}`,
+            referenceId: deposit.id,
+          });
+
+          await trx.insert(notificationsTable).values({
+            userId: user.id,
+            type: "deposit",
+            title: "Nạp tiền thành công",
+            message: `Tài khoản của bạn đã được cộng $${depositAmountUSD.toFixed(2)}. Số dư mới: $${newBalance.toFixed(2)}`,
+          });
+        });
+
+        await notifyAutoDepositApproved({
+          id: deposit.id,
+          userId: user.id,
+          amount: deposit.amount,
+          reference: `SMM${depositId} (GachTheFast: ${orderCode})`,
+        });
+
+        processed.push(`#${depositId}`);
+        console.log(`[GachTheFast] ✅ Duyệt deposit #${depositId} cho user #${user.id} — ${txAmount} VND`);
+      } catch (txErr: any) {
+        console.error("[GachTheFast] Lỗi xử lý giao dịch:", txErr.message);
+        errors.push(txErr.message);
+      }
+    }
+
+    return res.json({
+      success: true,
+      checked: transactions.length,
+      processed,
+      errors: errors.length ? errors : undefined,
+      timestamp: new Date().toISOString(),
+    });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }

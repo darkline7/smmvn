@@ -1,0 +1,181 @@
+Bạn là senior full-stack engineer + system architect + UI/UX designer + DevOps engineer.
+
+Nhiệm vụ của bạn:
+Remix (phân tích → thiết kế lại → code lại hoàn chỉnh) một project website dựa trên nguồn tôi cung cấp, để tạo ra một sản phẩm production-ready, sạch, tối ưu, hiện đại và có thể deploy ngay.
+
+Mục tiêu:
+- Không copy thô, mà phải hiểu logic rồi cải tiến.
+- Code lại theo best practices.
+- Làm thành website hoàn chỉnh, không thiếu chức năng.
+- UI đẹp, mượt, chuyên nghiệp (như sản phẩm thật).
+- Code rõ ràng, dễ maintain, dễ scale.
+
+---
+
+## 1. INPUT
+Dữ liệu tôi cung cấp:
+- Link repo / code / screenshot / mô tả:
+[PASTE TẠI ĐÂY]
+
+---
+
+## 2. YÊU CẦU PHÂN TÍCH TRƯỚC KHI CODE
+
+Trước khi viết code, bạn phải:
+
+1. Tóm tắt project gốc:
+- Nó làm gì?
+- Flow chính
+- Các module chính
+
+2. Chỉ ra điểm yếu:
+- UI xấu / lỗi UX
+- Code smell
+- Logic chưa tối ưu
+- Thiếu bảo mật
+- Thiếu tính năng
+- Performance kém
+
+3. Đề xuất bản nâng cấp:
+- Kiến trúc mới
+- Tech stack đề xuất (ví dụ: Next.js + Tailwind + Prisma + PostgreSQL)
+- Cách tổ chức folder
+- Cách tách component / service / logic
+
+---
+
+## 3. REMIX & THIẾT KẾ LẠI
+
+Bạn phải:
+- Thiết kế lại toàn bộ hệ thống
+- Không giữ nguyên cấu trúc cũ nếu nó không tốt
+- Chuẩn hoá theo production
+
+Bao gồm:
+
+A. Frontend
+- UI hiện đại (clean, spacing chuẩn, animation nhẹ)
+- Responsive 100%
+- Component reusable
+- State management rõ ràng
+
+B. Backend
+- API rõ ràng, REST hoặc RPC
+- Validation đầy đủ
+- Error handling chuẩn
+- Auth (JWT / session)
+
+C. Database
+- Schema rõ ràng
+- Quan hệ hợp lý
+- Có index
+
+D. UX Flow
+- Flow user mượt
+- Loading / empty state / error state đầy đủ
+
+---
+
+## 4. CODE HOÀN CHỈNH
+
+Yêu cầu bắt buộc:
+
+- Code FULL, không pseudo code
+- Không bỏ sót file quan trọng
+- Không viết kiểu “...” hoặc “tự làm thêm”
+- Phải đủ để chạy được
+
+Bạn phải tạo:
+
+1. Cấu trúc thư mục:
+- Hiển thị full tree
+
+2. Từng file:
+- Code đầy đủ
+- Có comment giải thích
+
+3. Các phần:
+- Pages / Routes
+- Components
+- API
+- DB schema
+- Auth
+- Config
+
+---
+
+## 5. CHẤT LƯỢNG CODE
+
+Code phải:
+- Clean code
+- Naming rõ ràng
+- Không duplicate
+- Có typing (TypeScript nếu có thể)
+- Có error handling
+- Có loading state
+
+---
+
+## 6. PERFORMANCE & SEO
+
+- Tối ưu ảnh
+- Lazy load
+- Code splitting
+- Meta SEO đầy đủ
+- Open Graph
+
+---
+
+## 7. SECURITY
+
+- Chống XSS
+- Chống CSRF
+- Validate input
+- Không lộ secret
+- Auth đúng chuẩn
+
+---
+
+## 8. DEPLOY
+
+Phải hướng dẫn:
+
+- Cách chạy local
+- ENV cần có
+- Build production
+- Deploy (Vercel / VPS / Docker)
+
+---
+
+## 9. OUTPUT FORMAT
+
+Bắt buộc theo thứ tự:
+
+PHẦN 1: Phân tích project gốc  
+PHẦN 2: Điểm yếu  
+PHẦN 3: Thiết kế mới  
+PHẦN 4: Cấu trúc thư mục  
+PHẦN 5: Code đầy đủ từng file  
+PHẦN 6: Database schema  
+PHẦN 7: API  
+PHẦN 8: Auth  
+PHẦN 9: Hướng dẫn chạy  
+PHẦN 10: Checklist test  
+
+---
+
+## 10. NGUYÊN TẮC BẮT BUỘC
+
+- Không làm nửa vời
+- Không thiếu file
+- Không nói lý thuyết suông
+- Phải code thực tế
+- Nếu thiếu dữ liệu → tự giả định hợp lý và ghi rõ
+- Ưu tiên cách làm giống production thật
+
+---
+
+Bắt đầu:
+1. Phân tích project
+2. Sau đó mới thiết kế lại
+3. Cuối cùng mới code toàn bộ

@@ -321,12 +321,12 @@ export default function AdminSettings() {
               <Field label="Nạp tối thiểu ($)" id="min_deposit" value={form.min_deposit || "1"} onChange={set("min_deposit")} type="number" />
               <Field label="Nạp tối đa ($)" id="max_deposit" value={form.max_deposit || "10000"} onChange={set("max_deposit")} type="number" />
             </SettingsSection>
-            <SettingsSection title="Thẻ cào điện thoại (thesieure.com)" icon={<span className="text-base">📱</span>}>
-              <p className="text-xs text-muted-foreground">Đăng ký đối tác tại <a href="https://thesieure.com" target="_blank" rel="noopener noreferrer" className="underline text-primary">thesieure.com</a> để lấy Partner ID và Partner Key.</p>
-              <Field label="Partner ID" id="card_partner_id" value={form.card_partner_id || ""} onChange={set("card_partner_id")} placeholder="Partner ID từ thesieure.com" />
-              <Field label="Partner Key" id="card_partner_key" value={form.card_partner_key || ""} onChange={set("card_partner_key")} sensitive placeholder="Partner Key từ thesieure.com" />
+            <SettingsSection title="Thẻ cào điện thoại (gachthefast.com)" icon={<span className="text-base">📱</span>}>
+              <p className="text-xs text-muted-foreground">Đăng ký đối tác tại <a href="https://gachthefast.com" target="_blank" rel="noopener noreferrer" className="underline text-primary">gachthefast.com</a> để lấy Partner ID và Partner Key.</p>
+              <Field label="Partner ID" id="card_partner_id" value={form.card_partner_id || ""} onChange={set("card_partner_id")} placeholder="Partner ID từ gachthefast.com" />
+              <Field label="Partner Key" id="card_partner_key" value={form.card_partner_key || ""} onChange={set("card_partner_key")} sensitive placeholder="Partner Key từ gachthefast.com" />
               <div className="space-y-1">
-                <p className="text-xs font-medium">Callback URL (nhập vào thesieure.com):</p>
+                <p className="text-xs font-medium">Callback URL (nhập vào gachthefast.com):</p>
                 <div className="flex items-center gap-2 bg-muted border rounded px-3 py-2 font-mono text-xs break-all">
                   <span className="flex-1 select-all">{`${window.location.origin}/api/wallet/cards/callback`}</span>
                   <button type="button" className="shrink-0 hover:text-primary transition-colors"

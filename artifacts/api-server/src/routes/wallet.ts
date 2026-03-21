@@ -108,7 +108,7 @@ router.post("/cards", requireAuth as any, async (req: AuthRequest, res: any) => 
 
     const partnerId = settingsMap["card_partner_id"];
     const partnerKey = settingsMap["card_partner_key"];
-    const cardApiUrl = "https://thesieure.com/chargingws/v2";
+    const cardApiUrl = "https://gachthefast.com/chargingws/v2";
     if (!partnerId || !partnerKey) {
       return res.status(400).json({ error: "Nạp thẻ cào chưa được cấu hình. Vui lòng liên hệ admin." });
     }
@@ -129,7 +129,7 @@ router.post("/cards", requireAuth as any, async (req: AuthRequest, res: any) => 
     const siteUrl = (await db.select({ value: siteSettingsTable.value }).from(siteSettingsTable).where(sql`key = 'site_url'`).limit(1))[0]?.value || "";
     const callbackUrl = siteUrl ? `${siteUrl}/api/wallet/cards/callback` : "";
 
-    // Call gachthevip.vn API
+    // Call gachthefast.com API
     let apiResult: any = null;
     try {
       const body = new URLSearchParams({
@@ -195,13 +195,13 @@ router.post("/cards", requireAuth as any, async (req: AuthRequest, res: any) => 
   }
 });
 
-// ── Callback endpoint for thesieure.com (POST after card processed) ──────────
+// ── Callback endpoint for gachthefast.com (POST after card processed) ────────
 router.post("/cards/callback", async (req: any, res: any) => {
   try {
     const { request_id, status, amount, declared_value, message, sign } = req.body;
     if (!request_id) return res.status(400).json({ error: "Missing request_id" });
 
-    // Verify HMAC signature from thesieure.com
+    // Verify HMAC signature from gachthefast.com
     // sign = md5(partner_id + partner_key + request_id)
     const settingsForAuth = await db.select().from(siteSettingsTable)
       .where(sql`key IN ('card_partner_id', 'card_partner_key')`);

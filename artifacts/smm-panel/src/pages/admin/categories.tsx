@@ -11,7 +11,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { Database, Plus, Edit2, Trash2, RefreshCw, GripVertical, Search, Layers } from "lucide-react";
+import {
+  Database, Plus, Edit2, Trash2, RefreshCw, GripVertical,
+  Search, ChevronDown, ChevronUp, Eye, EyeOff, Layers,
+} from "lucide-react";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor,
   useSensor, useSensors, type DragEndEvent,
@@ -24,42 +27,41 @@ import { CSS } from "@dnd-kit/utilities";
 
 const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
 
-const PLATFORM_ICONS: Record<string, string> = {
-  Instagram: "📸",
-  TikTok: "🎵",
-  Telegram: "✈️",
-  Facebook: "📘",
-  YouTube: "▶️",
-  Twitter: "🐦",
-  Spotify: "🎧",
-  Discord: "💬",
-  Threads: "🧵",
-  LinkedIn: "💼",
-  Snapchat: "👻",
-  Pinterest: "📌",
-  Twitch: "🟣",
-  Reddit: "🔴",
-  SoundCloud: "🔊",
-  Shazam: "🎤",
-  Google: "🔍",
-  Apple: "🍎",
-  VK: "💙",
-  Zalo: "💬",
-};
-
+// ─── Platform detection (same as services-list dashboard) ────────────────────
 function detectPlatform(name: string): string {
-  const lower = name.toLowerCase();
-  for (const p of Object.keys(PLATFORM_ICONS)) {
-    if (lower.startsWith(p.toLowerCase())) return p;
-  }
-  const dashIdx = name.indexOf(" - ");
-  if (dashIdx > 0) {
-    const prefix = name.slice(0, dashIdx).trim();
-    if (prefix.length > 0 && prefix.length < 30) return prefix;
-  }
+  const n = name.toLowerCase();
+  if (n.includes("instagram")) return "Instagram";
+  if (n.includes("facebook") || (n.includes("fb ") && !n.includes("tiktok"))) return "Facebook";
+  if (n.includes("tiktok") || n.includes("tik tok")) return "TikTok";
+  if (n.includes("youtube") || n.startsWith("yt ")) return "YouTube";
+  if (n.includes("twitter") || n.includes("x - ") || n.startsWith("x ")) return "Twitter/X";
+  if (n.includes("telegram")) return "Telegram";
+  if (n.includes("spotify")) return "Spotify";
+  if (n.includes("discord")) return "Discord";
+  if (n.includes("linkedin")) return "LinkedIn";
+  if (n.includes("snapchat")) return "Snapchat";
+  if (n.includes("pinterest")) return "Pinterest";
+  if (n.includes("twitch")) return "Twitch";
+  if (n.includes("kick")) return "Kick";
+  if (n.includes("threads")) return "Threads";
+  if (n.includes("soundcloud")) return "SoundCloud";
+  if (n.includes("website") || n.includes("seo") || n.includes("google")) return "Website/SEO";
+  if (n.includes("zalo")) return "Zalo";
+  if (n.includes("reddit")) return "Reddit";
+  if (n.includes("vk ") || n.startsWith("vk")) return "VK";
+  if (n.includes("whatsapp")) return "WhatsApp";
   return "Khác";
 }
 
+const PLATFORM_EMOJIS: Record<string, string> = {
+  Instagram: "📸", Facebook: "👤", TikTok: "🎵", YouTube: "▶️",
+  "Twitter/X": "🐦", Telegram: "✈️", Spotify: "🎧", Discord: "💬",
+  LinkedIn: "💼", Snapchat: "👻", Pinterest: "📌", Twitch: "🎮",
+  Kick: "⚡", Threads: "🧵", SoundCloud: "☁️", "Website/SEO": "🌐",
+  Zalo: "💬", Reddit: "🔴", VK: "💙", WhatsApp: "📱", Khác: "📦",
+};
+
+// ─── Category form ────────────────────────────────────────────────────────────
 const catSchema = z.object({
   name: z.string().min(2, "Tên tối thiểu 2 ký tự"),
   icon: z.string().optional(),
@@ -75,7 +77,6 @@ function CategoryForm({ cat, onDone }: { cat?: any; onDone: () => void }) {
       ? { name: cat.name, icon: cat.icon || "", description: cat.description || "", sortOrder: cat.sortOrder || 0 }
       : { name: "", icon: "", description: "", sortOrder: 0 },
   });
-
   const onSubmit = async (values: z.infer<typeof catSchema>) => {
     const url = cat ? `${BASE}/api/admin/categories/${cat.id}` : `${BASE}/api/admin/categories`;
     const method = cat ? "PATCH" : "POST";
@@ -84,12 +85,11 @@ function CategoryForm({ cat, onDone }: { cat?: any; onDone: () => void }) {
     toast({ title: cat ? "Cập nhật thành công!" : "Tạo danh mục thành công!" });
     onDone();
   };
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField control={form.control} name="name" render={({ field }) => (
-          <FormItem><FormLabel>Tên danh mục</FormLabel><FormControl><Input placeholder="Instagram, TikTok..." {...field} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>Tên danh mục</FormLabel><FormControl><Input placeholder="Instagram - Followers..." {...field} /></FormControl><FormMessage /></FormItem>
         )} />
         <FormField control={form.control} name="icon" render={({ field }) => (
           <FormItem><FormLabel>Icon (emoji)</FormLabel><FormControl><Input placeholder="📸" {...field} /></FormControl><FormMessage /></FormItem>
@@ -106,32 +106,44 @@ function CategoryForm({ cat, onDone }: { cat?: any; onDone: () => void }) {
   );
 }
 
-function SortableCategory({ cat, onEdit, onDelete }: { cat: any; onEdit: (c: any) => void; onDelete: (id: number) => void }) {
+// ─── Sortable row ─────────────────────────────────────────────────────────────
+function SortableCategory({
+  cat, onEdit, onDelete, onToggleVisible,
+}: {
+  cat: any;
+  onEdit: (c: any) => void;
+  onDelete: (id: number) => void;
+  onToggleVisible: (id: number, active: boolean) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: cat.id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 10 : undefined,
-  };
-  const platform = detectPlatform(cat.name);
-  const platformIcon = PLATFORM_ICONS[platform] || cat.icon || "📦";
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1, zIndex: isDragging ? 10 : undefined };
+  const icon = cat.icon || PLATFORM_EMOJIS[detectPlatform(cat.name)] || "📦";
 
   return (
-    <div ref={setNodeRef} style={style} className={`flex items-center gap-3 p-3.5 hover:bg-muted/20 border-b last:border-0 bg-background ${isDragging ? "shadow-lg rounded-xl" : ""}`}>
-      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-1 touch-none">
+    <div ref={setNodeRef} style={style}
+      className={`flex items-center gap-3 px-4 py-3 hover:bg-muted/20 border-b last:border-0 bg-background ${isDragging ? "shadow-lg rounded-xl" : ""} ${!cat.active ? "opacity-50" : ""}`}
+    >
+      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground p-1 touch-none flex-shrink-0">
         <GripVertical className="w-4 h-4" />
       </button>
-      <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center text-lg flex-shrink-0">
-        {cat.icon || platformIcon}
+      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-base flex-shrink-0">
+        {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm truncate">{cat.name}</p>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          ID: {cat.id} · Dịch vụ: {cat.serviceCount || 0}
-        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className={`font-medium text-sm truncate ${!cat.active ? "line-through text-muted-foreground" : ""}`}>{cat.name}</p>
+          {!cat.active && <Badge variant="outline" className="text-xs px-1.5 py-0 border-orange-300 text-orange-500">Ẩn</Badge>}
+        </div>
+        <p className="text-xs text-muted-foreground mt-0.5">ID: {cat.id} · {cat.serviceCount || 0} dịch vụ</p>
       </div>
       <div className="flex items-center gap-1 flex-shrink-0">
+        <Button
+          variant="ghost" size="icon" className={`h-8 w-8 ${cat.active ? "text-muted-foreground hover:text-foreground" : "text-orange-500 hover:text-orange-600"}`}
+          title={cat.active ? "Đang hiện — click để ẩn" : "Đang ẩn — click để hiện"}
+          onClick={() => onToggleVisible(cat.id, cat.active)}
+        >
+          {cat.active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+        </Button>
         <Dialog>
           <DialogTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(cat)}>
@@ -151,6 +163,57 @@ function SortableCategory({ cat, onEdit, onDelete }: { cat: any; onEdit: (c: any
   );
 }
 
+// ─── Platform group (accordion) ───────────────────────────────────────────────
+function PlatformGroup({
+  platform, cats, expanded, onToggle, onEdit, onDelete, onToggleVisible, onDragEnd, sensors,
+}: {
+  platform: string; cats: any[]; expanded: boolean; onToggle: () => void;
+  onEdit: (c: any) => void; onDelete: (id: number) => void;
+  onToggleVisible: (id: number, active: boolean) => void;
+  onDragEnd: (e: DragEndEvent, platform: string) => void;
+  sensors: any;
+}) {
+  const emoji = PLATFORM_EMOJIS[platform] || "📦";
+  const hiddenCount = cats.filter(c => !c.active).length;
+
+  return (
+    <Card className="border-border/50 shadow-sm overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left"
+      >
+        <span className="text-xl">{emoji}</span>
+        <div className="flex-1">
+          <span className="font-semibold text-sm">{platform}</span>
+          <span className="ml-2 text-xs text-muted-foreground">{cats.length} danh mục</span>
+          {hiddenCount > 0 && (
+            <span className="ml-1.5 text-xs text-orange-500">· {hiddenCount} đang ẩn</span>
+          )}
+        </div>
+        {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+      </button>
+
+      {expanded && (
+        <CardContent className="p-0 border-t border-border/30">
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={e => onDragEnd(e, platform)}>
+            <SortableContext items={cats.map(c => c.id)} strategy={verticalListSortingStrategy}>
+              <div>
+                {cats.map(c => (
+                  <SortableCategory
+                    key={c.id} cat={c}
+                    onEdit={onEdit} onDelete={onDelete} onToggleVisible={onToggleVisible}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function AdminCategories() {
   const { toast } = useToast();
   const [editCat, setEditCat] = useState<any>(null);
@@ -159,6 +222,8 @@ export default function AdminCategories() {
   const [saving, setSaving] = useState(false);
   const [activePlatform, setActivePlatform] = useState<string>("Tất cả");
   const [search, setSearch] = useState("");
+  const [expandedPlatforms, setExpandedPlatforms] = useState<Set<string>>(new Set());
+
   const { data, isLoading, refetch } = useAdminListCategories();
   const serverCats: any[] = data?.categories || [];
   const categories = localCats ?? serverCats;
@@ -168,35 +233,81 @@ export default function AdminCategories() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  // Build platform groups preserving order
   const platformGroups = useMemo(() => {
+    const seen = new Set<string>();
+    const order: string[] = [];
+    for (const c of categories) {
+      const p = detectPlatform(c.name);
+      if (!seen.has(p)) { seen.add(p); order.push(p); }
+    }
+    return order.map(p => ({
+      platform: p,
+      cats: categories.filter((c: any) => detectPlatform(c.name) === p),
+    }));
+  }, [categories]);
+
+  // Platform tab counts
+  const platformCounts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const c of categories) {
       const p = detectPlatform(c.name);
       map[p] = (map[p] || 0) + 1;
     }
-    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+    return map;
   }, [categories]);
 
-  const filteredCats = useMemo(() => {
-    let list = categories;
+  // Filtered groups based on active tab + search
+  const visibleGroups = useMemo(() => {
+    let groups = platformGroups;
     if (activePlatform !== "Tất cả") {
-      list = list.filter((c: any) => detectPlatform(c.name) === activePlatform);
+      groups = groups.filter(g => g.platform === activePlatform);
     }
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter((c: any) => c.name.toLowerCase().includes(q) || String(c.id).includes(q));
+      groups = groups.map(g => ({
+        ...g,
+        cats: g.cats.filter((c: any) => c.name.toLowerCase().includes(q) || String(c.id).includes(q)),
+      })).filter(g => g.cats.length > 0);
     }
-    return list;
-  }, [categories, activePlatform, search]);
+    return groups;
+  }, [platformGroups, activePlatform, search]);
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const totalVisible = visibleGroups.reduce((sum, g) => sum + g.cats.length, 0);
+
+  const togglePlatform = (p: string) => {
+    setExpandedPlatforms(prev => {
+      const next = new Set(prev);
+      if (next.has(p)) next.delete(p); else next.add(p);
+      return next;
+    });
+  };
+
+  // Expand selected platform automatically
+  const handleSelectPlatform = (p: string) => {
+    setActivePlatform(p);
+    if (p !== "Tất cả") {
+      setExpandedPlatforms(prev => new Set([...prev, p]));
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent, platform: string) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = categories.findIndex((c: any) => c.id === active.id);
-    const newIndex = categories.findIndex((c: any) => c.id === over.id);
-    const reordered = arrayMove(categories, oldIndex, newIndex).map((c, i) => ({ ...c, sortOrder: i }));
-    setLocalCats(reordered);
+    const group = platformGroups.find(g => g.platform === platform);
+    if (!group) return;
+    const platCats = group.cats;
+    const oldIdx = platCats.findIndex((c: any) => c.id === active.id);
+    const newIdx = platCats.findIndex((c: any) => c.id === over.id);
+    const reorderedPlat = arrayMove(platCats, oldIdx, newIdx);
+
+    const newAll = categories.map((c: any) => {
+      const idx = reorderedPlat.findIndex((r: any) => r.id === c.id);
+      if (idx >= 0) return { ...c, sortOrder: idx };
+      return c;
+    });
+    setLocalCats(newAll);
 
     setSaving(true);
     try {
@@ -204,9 +315,9 @@ export default function AdminCategories() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ orders: reordered.map((c: any) => ({ id: c.id, sortOrder: c.sortOrder })) }),
+        body: JSON.stringify({ orders: reorderedPlat.map((c: any, i: number) => ({ id: c.id, sortOrder: i })) }),
       });
-      toast({ title: "Đã lưu thứ tự danh mục" });
+      toast({ title: "Đã lưu thứ tự" });
     } catch {
       toast({ title: "Lỗi lưu thứ tự", variant: "destructive" });
     } finally {
@@ -214,8 +325,24 @@ export default function AdminCategories() {
     }
   };
 
-  const deletecat = async (id: number) => {
-    if (!confirm("Xóa danh mục này?")) return;
+  const handleToggleVisible = async (id: number, currentActive: boolean) => {
+    setLocalCats(prev => (prev ?? serverCats).map((c: any) => c.id === id ? { ...c, active: !currentActive } : c));
+    const res = await fetch(`${BASE}/api/admin/categories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ active: !currentActive }),
+    });
+    if (!res.ok) {
+      setLocalCats(null);
+      toast({ title: "Lỗi cập nhật", variant: "destructive" });
+      return;
+    }
+    toast({ title: currentActive ? "Đã ẩn danh mục" : "Đã hiện danh mục" });
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Xóa danh mục này? (Danh mục sẽ bị vô hiệu hóa)")) return;
     await fetch(`${BASE}/api/admin/categories/${id}`, { method: "DELETE", credentials: "include" });
     toast({ title: "Đã xóa danh mục" });
     setLocalCats(null);
@@ -225,12 +352,14 @@ export default function AdminCategories() {
   return (
     <DashboardLayout isAdminLayout>
       <div className="space-y-5 pb-8 animate-in fade-in duration-500">
+
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold font-display">Danh mục</h2>
             <p className="text-muted-foreground mt-1">
-              {filteredCats.length} / {categories.length} danh mục
-              {activePlatform !== "Tất cả" && <span className="ml-1">· <span className="font-medium text-foreground">{activePlatform}</span></span>}
+              {totalVisible} / {categories.length} danh mục
+              {activePlatform !== "Tất cả" && <> · <span className="font-medium text-foreground">{activePlatform}</span></>}
               {saving && " · Đang lưu..."}
             </p>
           </div>
@@ -265,7 +394,7 @@ export default function AdminCategories() {
         {!isLoading && (
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setActivePlatform("Tất cả")}
+              onClick={() => handleSelectPlatform("Tất cả")}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                 activePlatform === "Tất cả"
                   ? "bg-primary text-primary-foreground border-primary"
@@ -274,25 +403,27 @@ export default function AdminCategories() {
             >
               <Layers className="w-3.5 h-3.5" />
               Tất cả
-              <Badge variant="secondary" className="ml-0.5 h-5 px-1.5 text-xs">{categories.length}</Badge>
+              <Badge variant="secondary" className={`ml-0.5 h-5 px-1.5 text-xs ${activePlatform === "Tất cả" ? "bg-primary-foreground/20 text-primary-foreground" : ""}`}>
+                {categories.length}
+              </Badge>
             </button>
-            {platformGroups.map(([platform, count]) => {
-              const icon = PLATFORM_ICONS[platform] || "📦";
+            {platformGroups.map(({ platform }) => {
+              const emoji = PLATFORM_EMOJIS[platform] || "📦";
               const isActive = activePlatform === platform;
               return (
                 <button
                   key={platform}
-                  onClick={() => setActivePlatform(platform)}
+                  onClick={() => handleSelectPlatform(platform)}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                     isActive
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-background border-border hover:bg-muted"
                   }`}
                 >
-                  <span>{icon}</span>
+                  <span>{emoji}</span>
                   {platform}
-                  <Badge variant={isActive ? "outline" : "secondary"} className={`ml-0.5 h-5 px-1.5 text-xs ${isActive ? "border-primary-foreground/50 text-primary-foreground" : ""}`}>
-                    {count}
+                  <Badge variant="secondary" className={`ml-0.5 h-5 px-1.5 text-xs ${isActive ? "bg-primary-foreground/20 text-primary-foreground" : ""}`}>
+                    {platformCounts[platform] || 0}
                   </Badge>
                 </button>
               );
@@ -300,43 +431,41 @@ export default function AdminCategories() {
           </div>
         )}
 
-        {activePlatform === "Tất cả" && !search && (
-          <div className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/40 border rounded-lg px-3 py-2">
-            <GripVertical className="w-3.5 h-3.5 flex-shrink-0" />
-            Kéo thả để sắp xếp thứ tự hiển thị danh mục. Thứ tự được lưu tự động.
+        {/* Loading skeleton */}
+        {isLoading && (
+          <div className="space-y-3">
+            {[1,2,3,4].map(i => <div key={i} className="h-14 bg-muted animate-pulse rounded-xl" />)}
           </div>
         )}
 
-        <Card className="border-border/50 shadow-sm">
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="p-6 space-y-3">{[1,2,3,4,5].map(i => <div key={i} className="h-14 bg-muted animate-pulse rounded-xl"></div>)}</div>
-            ) : !filteredCats.length ? (
-              <div className="text-center py-16 text-muted-foreground">
-                <Database className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p>{search ? `Không tìm thấy danh mục khớp "${search}"` : "Chưa có danh mục nào"}</p>
-              </div>
-            ) : (activePlatform === "Tất cả" && !search) ? (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={filteredCats.map((c: any) => c.id)} strategy={verticalListSortingStrategy}>
-                  <div className="divide-y divide-border/30">
-                    {filteredCats.map((c: any) => (
-                      <SortableCategory key={c.id} cat={c} onEdit={setEditCat} onDelete={deletecat} />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
-            ) : (
-              <div className="divide-y divide-border/30">
-                {filteredCats.map((c: any) => (
-                  <SortableCategory key={c.id} cat={c} onEdit={setEditCat} onDelete={deletecat} />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Empty */}
+        {!isLoading && visibleGroups.length === 0 && (
+          <Card className="border-border/50">
+            <CardContent className="text-center py-16 text-muted-foreground">
+              <Database className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>{search ? `Không tìm thấy danh mục khớp "${search}"` : "Chưa có danh mục nào"}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Platform groups */}
+        {!isLoading && visibleGroups.map(({ platform, cats }) => (
+          <PlatformGroup
+            key={platform}
+            platform={platform}
+            cats={cats}
+            expanded={expandedPlatforms.has(platform)}
+            onToggle={() => togglePlatform(platform)}
+            onEdit={setEditCat}
+            onDelete={handleDelete}
+            onToggleVisible={handleToggleVisible}
+            onDragEnd={handleDragEnd}
+            sensors={sensors}
+          />
+        ))}
       </div>
 
+      {/* Edit dialog */}
       {editCat && (
         <Dialog open={!!editCat} onOpenChange={open => !open && setEditCat(null)}>
           <DialogContent>

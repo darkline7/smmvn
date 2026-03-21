@@ -233,17 +233,19 @@ export default function AdminCategories() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // Build platform groups preserving order
+  // Build platform groups preserving order, sorted by sortOrder within each group
   const platformGroups = useMemo(() => {
     const seen = new Set<string>();
     const order: string[] = [];
-    for (const c of categories) {
+    for (const c of [...categories].sort((a: any, b: any) => a.sortOrder - b.sortOrder)) {
       const p = detectPlatform(c.name);
       if (!seen.has(p)) { seen.add(p); order.push(p); }
     }
     return order.map(p => ({
       platform: p,
-      cats: categories.filter((c: any) => detectPlatform(c.name) === p),
+      cats: categories
+        .filter((c: any) => detectPlatform(c.name) === p)
+        .sort((a: any, b: any) => a.sortOrder - b.sortOrder),
     }));
   }, [categories]);
 

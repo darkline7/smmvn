@@ -313,6 +313,16 @@ export default function AdminSettings() {
               <Field label="BIN ngân hàng (SePay)" id="bank_bin" value={form.bank_bin || ""} onChange={set("bank_bin")} placeholder="970422" description="Mã BIN dùng cho QR SePay. MB Bank = 970422" />
             </SettingsSection>
             <SettingsSection title="SePay Webhook" icon={<Zap className="w-4 h-4" />}>
+              <div className="space-y-1">
+                <p className="text-xs font-medium">Webhook URL (nhập vào SePay Dashboard → Webhook):</p>
+                <div className="flex items-center gap-2 bg-muted border rounded px-3 py-2 font-mono text-xs break-all">
+                  <span className="flex-1 select-all">{`${window.location.origin}/api/webhooks/sepay`}</span>
+                  <button type="button" className="shrink-0 hover:text-primary transition-colors"
+                    onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/sepay`)}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                  </button>
+                </div>
+              </div>
               <Field label="SePay Webhook Secret" id="sepay_webhook_secret" value={form.sepay_webhook_secret || ""} onChange={set("sepay_webhook_secret")} sensitive description="Cấu hình trong SePay Dashboard → Webhook" />
               <div className="flex items-center gap-3">
                 <Switch checked={form.sepay_enabled === "true"} onCheckedChange={() => toggle("sepay_enabled")} id="sepay_enabled" />

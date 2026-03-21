@@ -4,6 +4,16 @@
 
 Full-stack Social Media Marketing panel with user dashboard, admin panel, API v2, and complete order management system.
 
+## Recent Improvements (March 2026)
+
+- **Orders page**: Full Vietnamese language consistency, server-side pagination with URL state persistence, VND price display alongside USD
+- **Sidebar**: Added prominent "Tạo đơn hàng mới" CTA button, real unread notification badge counts from API
+- **Dashboard chart**: Replaced custom div bar chart with proper Recharts AreaChart with tooltip (VND + USD) and grid
+- **Topbar**: Dynamic page titles from route-name mapping (human-readable Vietnamese) instead of raw URL slugs
+- **Notification dot**: Real unread count from `/api/notifications` instead of always-visible hardcoded dot
+- **Router**: Registered missing `/subscriptions` route (`subscriptions.tsx` page was orphaned)
+- **Admin nav**: Translated "Users" sidebar label to Vietnamese ("Người dùng")
+
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces

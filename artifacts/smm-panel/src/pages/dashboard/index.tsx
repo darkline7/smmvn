@@ -5,15 +5,68 @@ import { formatCurrency, formatNumber } from "@/lib/utils";
 import { Wallet, ShoppingCart, CheckCircle2, TrendingUp, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { NewOrderForm } from "@/components/new-order-form";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
+import { format } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+
+const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Chờ xử lý",
+  processing: "Đang xử lý",
+  active: "Đang hoạt động",
+  completed: "Hoàn thành",
+  partial: "Một phần",
+  cancelled: "Đã hủy",
+  failed: "Thất bại",
+};
 
 export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useGetDashboardStats();
   const { data: chartData, isLoading: chartLoading } = useGetDashboardChart({ period: "30d" });
   const { data: recentOrdersData, isLoading: ordersLoading } = useListOrders({ limit: 5 });
 
+  const { data: publicSettings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/public/settings`);
+      if (!r.ok) return null;
+      return r.json();
+    },
+    staleTime: 5 * 60_000,
+  });
+  const vndRate = Number(publicSettings?.vndExchangeRate || 24000);
+
+  const chartPoints = (chartData?.data || []).map((d: any) => ({
+    date: d.date ? format(new Date(d.date), "dd/MM") : "",
+    chi: Number(d.spend || 0),
+  }));
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    const usd = payload[0]?.value || 0;
+    return (
+      <div className="bg-popover border border-border rounded-lg px-3 py-2 shadow-lg text-xs">
+        <p className="text-muted-foreground mb-1">{label}</p>
+        <p className="font-semibold text-foreground">{Math.ceil(usd * vndRate).toLocaleString("vi-VN")}đ</p>
+        <p className="text-muted-foreground">${usd.toFixed(3)}</p>
+      </div>
+    );
+  };
+
   const StatCard = ({ title, value, icon: Icon, description, colorClass }: any) => (
     <Card className="border-border/50 shadow-sm hover:shadow-md transition-all duration-300 group overflow-hidden relative">
-      <div className={`absolute top-0 right-0 w-28 h-28 bg-gradient-to-br ${colorClass} opacity-5 rounded-full -mr-8 -mt-8 group-hover:scale-150 transition-transform duration-700`}></div>
+      <div
+        className={`absolute top-0 right-0 w-28 h-28 bg-gradient-to-br ${colorClass} opacity-5 rounded-full -mr-8 -mt-8 group-hover:scale-150 transition-transform duration-700`}
+      />
       <CardContent className="p-4 sm:p-5 relative z-10">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-medium text-muted-foreground text-xs sm:text-sm">{title}</h3>
@@ -33,21 +86,47 @@ export default function Dashboard() {
     <DashboardLayout>
       <div className="space-y-4 pb-4 animate-in fade-in duration-500">
 
-        {/* ── Section 1: Stats ── */}
+        {/* Section 1: Stats */}
         {statsLoading ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[1,2,3,4].map(i => <div key={i} className="h-24 bg-secondary animate-pulse rounded-2xl"></div>)}
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-24 bg-secondary animate-pulse rounded-2xl" />
+            ))}
           </div>
         ) : stats ? (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard title="Số dư" value={formatCurrency(stats.balance, stats.currency)} icon={Wallet} description="Sẵn sàng đặt hàng" colorClass="from-primary to-accent" />
-            <StatCard title="Tổng đơn hàng" value={formatNumber(stats.totalOrders)} icon={ShoppingCart} description="Tổng đơn đã đặt" colorClass="from-blue-500 to-cyan-500" />
-            <StatCard title="Hoàn thành" value={formatNumber(stats.completedOrders)} icon={CheckCircle2} description="Đã giao thành công" colorClass="from-success to-emerald-500" />
-            <StatCard title="Chi tháng này" value={formatCurrency(stats.monthlySpend, stats.currency)} icon={TrendingUp} description="30 ngày qua" colorClass="from-purple-500 to-pink-500" />
+            <StatCard
+              title="Số dư"
+              value={formatCurrency(stats.balance, stats.currency)}
+              icon={Wallet}
+              description="Sẵn sàng đặt hàng"
+              colorClass="from-primary to-accent"
+            />
+            <StatCard
+              title="Tổng đơn hàng"
+              value={formatNumber(stats.totalOrders)}
+              icon={ShoppingCart}
+              description="Tổng đơn đã đặt"
+              colorClass="from-blue-500 to-cyan-500"
+            />
+            <StatCard
+              title="Hoàn thành"
+              value={formatNumber(stats.completedOrders)}
+              icon={CheckCircle2}
+              description="Đã giao thành công"
+              colorClass="from-success to-emerald-500"
+            />
+            <StatCard
+              title="Chi tháng này"
+              value={formatCurrency(stats.monthlySpend, stats.currency)}
+              icon={TrendingUp}
+              description="30 ngày qua"
+              colorClass="from-purple-500 to-pink-500"
+            />
           </div>
         ) : null}
 
-        {/* ── Section 2: Order Form (left) + Chart & Recent Orders (right) ── */}
+        {/* Section 2: Order Form + Chart & Recent Orders */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4 items-start">
 
           {/* Order Form */}
@@ -65,48 +144,61 @@ export default function Dashboard() {
 
           {/* Right column: Chart + Recent Orders */}
           <div className="flex flex-col gap-4">
-            {/* Chi tiêu 30 ngày */}
+
+            {/* Recharts spending chart */}
             <Card className="border-border/50 shadow-sm">
               <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-sm font-semibold">Chi tiêu 30 ngày</CardTitle>
+                <CardTitle className="text-sm font-semibold">Chi tiêu 30 ngày qua</CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4">
-                <div className="h-[110px] w-full rounded-xl border border-dashed border-border bg-secondary/20 relative overflow-hidden">
-                  {chartLoading ? (
-                    <div className="animate-pulse flex space-x-1 items-end h-full w-full p-2">
-                      {[40,70,45,90,65,85,30,60,100,50,45,75,55,80,35,65,95,50,70,40,85,60,75,45,90,55,70,85,60,95].map((h,i) => (
-                        <div key={i} className="bg-primary/20 flex-1 rounded-t-sm" style={{ height: `${h}%` }}></div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex space-x-0.5 items-end h-full w-full px-2 pb-0 pt-2">
-                      {(chartData?.data || []).map((d, i) => {
-                        const spendVal = Number(d.spend) || 0;
-                        const allSpend = (chartData?.data || []).map(x => Number(x.spend) || 0);
-                        const maxSpend = allSpend.length > 0 ? Math.max(...allSpend) : 0;
-                        const height = Math.max(6, maxSpend > 0 ? (spendVal / maxSpend) * 90 : 6);
-                        return (
-                          <div key={i} className="flex-1 group relative flex justify-center h-full items-end">
-                            <div className="bg-primary/40 hover:bg-primary/70 transition-colors w-full rounded-t-sm" style={{ height: `${height}%` }}>
-                              {spendVal > 0 && (
-                                <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-foreground text-background text-[9px] py-0.5 px-1 rounded whitespace-nowrap z-20 pointer-events-none transition-opacity">
-                                  ${spendVal.toFixed(2)}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {(!chartData?.data || chartData.data.length === 0) && (
-                        <div className="flex-1 flex items-center justify-center text-xs text-muted-foreground">Chưa có dữ liệu</div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                {chartLoading ? (
+                  <div className="h-[130px] bg-secondary/40 animate-pulse rounded-xl" />
+                ) : chartPoints.length === 0 ? (
+                  <div className="h-[130px] flex items-center justify-center text-sm text-muted-foreground border border-dashed rounded-xl">
+                    Chưa có dữ liệu chi tiêu
+                  </div>
+                ) : (
+                  <div className="h-[130px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={chartPoints} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="spendGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                        <XAxis
+                          dataKey="date"
+                          tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                          tickLine={false}
+                          axisLine={false}
+                          interval={4}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                          tickLine={false}
+                          axisLine={false}
+                          tickFormatter={(v) => `$${v}`}
+                        />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Area
+                          type="monotone"
+                          dataKey="chi"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth={2}
+                          fill="url(#spendGrad)"
+                          dot={false}
+                          activeDot={{ r: 4, fill: "hsl(var(--primary))" }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Đơn hàng gần đây */}
+            {/* Recent Orders */}
             <Card className="border-border/50 shadow-sm flex flex-col">
               <CardHeader className="pb-2 pt-4 px-4 border-b border-border/30">
                 <CardTitle className="text-sm font-semibold">Đơn hàng gần đây</CardTitle>
@@ -114,39 +206,56 @@ export default function Dashboard() {
               <CardContent className="p-0 flex-1">
                 {ordersLoading ? (
                   <div className="p-4 space-y-2">
-                    {[1,2,3].map(i => <div key={i} className="h-9 bg-secondary animate-pulse rounded-lg"></div>)}
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-9 bg-secondary animate-pulse rounded-lg" />
+                    ))}
                   </div>
                 ) : (recentOrdersData?.orders || []).length === 0 ? (
                   <div className="p-6 text-center text-muted-foreground flex flex-col items-center">
                     <Clock className="h-7 w-7 mb-2 opacity-20" />
-                    <p className="text-sm">Chưa có đơn hàng</p>
+                    <p className="text-sm">Chưa có đơn hàng nào</p>
                   </div>
                 ) : (
                   <div className="divide-y divide-border/40">
-                    {recentOrdersData?.orders.map(order => (
-                      <div key={order.id} className="px-4 py-2.5 hover:bg-muted/40 transition-colors flex justify-between items-center gap-3">
-                        <div className="overflow-hidden flex-1 min-w-0">
-                          <p className="text-xs font-mono font-semibold text-primary">#{order.id}</p>
-                          <p className="text-xs text-muted-foreground truncate">{order.serviceName}</p>
+                    {recentOrdersData?.orders.map((order) => {
+                      const chargeUsd = Number(order.charge || 0);
+                      const chargeVnd = Math.ceil(chargeUsd * vndRate);
+                      return (
+                        <div
+                          key={order.id}
+                          className="px-4 py-2.5 hover:bg-muted/40 transition-colors flex justify-between items-center gap-3"
+                        >
+                          <div className="overflow-hidden flex-1 min-w-0">
+                            <p className="text-xs font-mono font-semibold text-primary">#{order.id}</p>
+                            <p className="text-xs text-muted-foreground truncate">{order.serviceName}</p>
+                          </div>
+                          <div className="text-right shrink-0 space-y-0.5">
+                            <Badge
+                              variant={
+                                order.status === "completed"
+                                  ? "success"
+                                  : order.status === "pending" || order.status === "processing"
+                                  ? "warning"
+                                  : order.status === "cancelled" || order.status === "failed"
+                                  ? "destructive"
+                                  : "default"
+                              }
+                              className="text-xs block text-center capitalize"
+                            >
+                              {STATUS_LABELS[order.status] || order.status}
+                            </Badge>
+                            <p className="text-xs font-medium text-foreground tabular-nums">
+                              {chargeVnd.toLocaleString("vi-VN")}đ
+                            </p>
+                          </div>
                         </div>
-                        <div className="text-right shrink-0 space-y-0.5">
-                          <Badge variant={
-                            order.status === 'completed' ? 'success' :
-                            order.status === 'pending' || order.status === 'processing' ? 'warning' :
-                            order.status === 'cancelled' || order.status === 'failed' ? 'destructive' : 'default'
-                          } className="text-xs block text-center capitalize">
-                            {order.status}
-                          </Badge>
-                          <p className="text-xs font-medium text-foreground">${Number(order.charge || 0).toFixed(2)}</p>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
-
         </div>
       </div>
     </DashboardLayout>

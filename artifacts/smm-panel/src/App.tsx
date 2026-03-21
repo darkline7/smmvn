@@ -100,6 +100,7 @@ const ServicesList = lazy(() => import("./pages/dashboard/services-list"));
 const MassOrder = lazy(() => import("./pages/dashboard/mass-order"));
 const DripFeed = lazy(() => import("./pages/dashboard/drip-feed"));
 const SubdomainsPage = lazy(() => import("./pages/dashboard/subdomains"));
+const Subscriptions = lazy(() => import("./pages/dashboard/subscriptions"));
 
 // Admin
 const AdminDashboard = lazy(() => import("./pages/admin/index"));
@@ -213,6 +214,7 @@ function Router() {
         <Route path="/mass-order" component={MassOrder} />
         <Route path="/drip-feed" component={DripFeed} />
         <Route path="/subdomains" component={SubdomainsPage} />
+        <Route path="/subscriptions" component={Subscriptions} />
 
         {/* Admin */}
         <Route path="/admin" component={AdminDashboard} />

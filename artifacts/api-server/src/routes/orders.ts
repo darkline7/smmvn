@@ -5,7 +5,10 @@ import { eq, and, desc, ilike, sql, inArray } from "drizzle-orm";
 import { requireAuth } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
 import { callProviderApi } from "../lib/provider.js";
+import { orderRateLimit } from "../lib/rate-limits.js";
+import { urlSchema, quantitySchema, sanitizeString } from "../lib/validate.js";
 import { z } from "zod";
+import { toUserMessage } from "../lib/errors.js";
 
 const router = Router();
 
@@ -52,15 +55,15 @@ router.get("/", requireAuth as any, async (req: AuthRequest, res: any) => {
 
 const createOrderSchema = z.object({
   serviceId: z.number().int().positive(),
-  link: z.string().url(),
-  quantity: z.number().int().positive(),
+  link: urlSchema,
+  quantity: quantitySchema,
   runs: z.number().int().positive().optional(),
   interval: z.number().int().positive().optional(),
-  comments: z.string().optional(),
-  username: z.string().optional(),
+  comments: z.string().max(500).optional(),
+  username: z.string().max(100).optional(),
 });
 
-router.post("/", requireAuth as any, async (req: AuthRequest, res: any) => {
+router.post("/", requireAuth as any, orderRateLimit, async (req: AuthRequest, res: any) => {
   try {
     const data = createOrderSchema.parse(req.body);
     

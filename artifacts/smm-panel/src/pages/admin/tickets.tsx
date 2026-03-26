@@ -21,8 +21,8 @@ function TicketChat({ ticketId, onClose }: { ticketId: number; onClose: () => vo
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
 
-  const ticket = data?.ticket || data;
-  const messages = data?.messages || [];
+  const ticket = (data as any)?.ticket || data;
+  const messages = (data as any)?.messages || [];
 
   const sendReply = async () => {
     if (!reply.trim()) return;

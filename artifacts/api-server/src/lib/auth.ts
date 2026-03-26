@@ -79,7 +79,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   }
   req.userId = session.userId;
   req.userRole = session.userRole;
-  next();
+  return next();
 }
 
 export async function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
@@ -89,7 +89,7 @@ export async function requireAdmin(req: AuthRequest, res: Response, next: NextFu
   }
   req.userId = session.userId;
   req.userRole = session.userRole;
-  next();
+  return next();
 }
 
 export async function requireApiKey(req: AuthRequest, res: Response, next: NextFunction) {
@@ -103,5 +103,5 @@ export async function requireApiKey(req: AuthRequest, res: Response, next: NextF
   }
   req.userId = user[0].id;
   req.userRole = user[0].role;
-  next();
+  return next();
 }

@@ -3,6 +3,7 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SupportChatButton } from "@/components/support-chat-button";
 import { Loader2 } from "lucide-react";
 
 const CHUNK_RELOAD_KEY = "smm_chunk_reload_v1";
@@ -246,6 +247,7 @@ function App() {
             <Router />
           </WouterRouter>
           <Toaster />
+          <SupportChatButton />
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>

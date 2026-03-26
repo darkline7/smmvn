@@ -78,6 +78,8 @@ async function ensureSettings() {
   }
 }
 
+// NOTE: Default user seeding is intentionally REMOVED for security.
+// Admin must manually create admin account. See INITIAL_SETUP.md
 async function seedUsersIfEmpty() {
   try {
     const [{ value: userCount }] = await db
@@ -85,40 +87,19 @@ async function seedUsersIfEmpty() {
       .from(usersTable);
     if (Number(userCount) > 0) return;
 
-    console.log("[startup] No users found — seeding default admin + demo accounts...");
-
-    const adminHash = await hashPassword("password");
-    const demoHash = await hashPassword("password");
-
-    await db.insert(usersTable).values([
-      {
-        email: "admin@smmpanel.com",
-        username: "admin",
-        passwordHash: adminHash,
-        role: "admin",
-        balance: "999999.0000",
-        currency: "USD",
-        apiKey: generateApiKey(),
-        referralCode: generateReferralCode(),
-        emailVerified: true,
-      },
-      {
-        email: "demo@smmpanel.com",
-        username: "demo",
-        passwordHash: demoHash,
-        role: "user",
-        balance: "50.0000",
-        currency: "USD",
-        apiKey: generateApiKey(),
-        referralCode: generateReferralCode(),
-        emailVerified: true,
-      },
-    ]);
-
-    console.log("[startup] Seed complete: admin@smmpanel.com / password");
-    console.log("[startup] IMPORTANT: Change admin password immediately after first login!");
+    console.warn("");
+    console.warn("┌─────────────────────────────────────────────────────┐");
+    console.warn("│  ⚠️  NO ADMIN ACCOUNT FOUND                         │");
+    console.warn("├─────────────────────────────────────────────────────┤");
+    console.warn("│  Please create admin account manually:              │");
+    console.warn("│  See: INITIAL_SETUP.md                              │");
+    console.warn("│  Or use: /api/admin/setup (after implementation)    │");
+    console.warn("│                                                      │");
+    console.warn("│  ⚠️  DO NOT use default passwords in production!    │");
+    console.warn("└─────────────────────────────────────────────────────┘");
+    console.warn("");
   } catch (err) {
-    console.error("[startup] User seed error:", err);
+    console.error("[startup] User check error:", err);
   }
 }
 

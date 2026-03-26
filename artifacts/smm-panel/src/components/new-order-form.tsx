@@ -293,11 +293,14 @@ export function NewOrderForm({ compact = false }: { compact?: boolean }) {
           <SelectTrigger className="bg-background h-11">
             <SelectValue placeholder={catLoading ? "Đang tải..." : "-- Chọn phân loại --"} />
           </SelectTrigger>
-          <SelectContent className="max-h-72">
+          <SelectContent className="max-h-48 w-full">
             {filteredCats.map((cat: any) => (
               <SelectItem key={cat.id} value={cat.id.toString()}>
-                {PLATFORM_EMOJI[detectPlatform(cat.name)] || "📦"} {cat.name}
-                {cat.serviceCount > 0 ? ` (${cat.serviceCount})` : ""}
+                <div className="flex items-start gap-2 max-w-xs">
+                  <span className="shrink-0 mt-0.5">{PLATFORM_EMOJI[detectPlatform(cat.name)] || "📦"}</span>
+                  <span className="line-clamp-2">{cat.name}</span>
+                  {cat.serviceCount > 0 && <span className="shrink-0 whitespace-nowrap">({cat.serviceCount})</span>}
+                </div>
               </SelectItem>
             ))}
           </SelectContent>

@@ -306,48 +306,76 @@ export default function AdminSettings() {
 
           {/* ===== TAB SEPAY / BANK ===== */}
           <TabsContent value="bank" className="space-y-4 mt-4">
+            <SettingsSection title="Phương thức thanh toán" icon={<Building2 className="w-4 h-4" />}>
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Chọn phương thức nhận nạp tiền:</Label>
+                <div className="flex gap-3">
+                  {[
+                    { id: "sepay", label: "💳 SePay (Webhook tự động xác nhận)" },
+                    { id: "thueapibank", label: "🏦 ThueAPIBank (Kiểm tra thủ công)" },
+                  ].map(({ id, label }) => (
+                    <button
+                      key={id}
+                      onClick={() => set("payment_method")(id)}
+                      className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors font-medium text-sm ${
+                        form.payment_method === id
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border bg-background text-foreground hover:border-primary/50"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </SettingsSection>
+
             <SettingsSection title="Thông tin ngân hàng" icon={<Building2 className="w-4 h-4" />}>
               <Field label="Tên ngân hàng" id="bank_name" value={form.bank_name || ""} onChange={set("bank_name")} placeholder="MB Bank" />
               <Field label="Số tài khoản" id="bank_account_number" value={form.bank_account_number || ""} onChange={set("bank_account_number")} placeholder="0397700999" />
               <Field label="Tên chủ tài khoản" id="bank_account_name" value={form.bank_account_name || ""} onChange={set("bank_account_name")} placeholder="NGUYEN VAN A" />
               <Field label="BIN ngân hàng (SePay)" id="bank_bin" value={form.bank_bin || ""} onChange={set("bank_bin")} placeholder="970422" description="Mã BIN dùng cho QR SePay. MB Bank = 970422" />
             </SettingsSection>
-            <SettingsSection title="SePay Webhook" icon={<Zap className="w-4 h-4" />}>
-              <div className="space-y-1">
-                <p className="text-xs font-medium">Webhook URL (nhập vào SePay Dashboard → Webhook):</p>
-                <div className="flex items-center gap-2 bg-muted border rounded px-3 py-2 font-mono text-xs break-all">
-                  <span className="flex-1 select-all">{`${window.location.origin}/api/webhooks/sepay`}</span>
-                  <button type="button" className="shrink-0 hover:text-primary transition-colors"
-                    onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/sepay`)}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                  </button>
-                </div>
-              </div>
-              <Field label="SePay Webhook Secret" id="sepay_webhook_secret" value={form.sepay_webhook_secret || ""} onChange={set("sepay_webhook_secret")} sensitive description="Cấu hình trong SePay Dashboard → Webhook" />
-              <div className="flex items-center gap-3">
-                <Switch checked={form.sepay_enabled === "true"} onCheckedChange={() => toggle("sepay_enabled")} id="sepay_enabled" />
-                <Label htmlFor="sepay_enabled" className="text-green-600 font-medium">Bật SePay tự động xác nhận nạp tiền</Label>
-              </div>
-              <Field label="Nạp tối thiểu ($)" id="min_deposit" value={form.min_deposit || "1"} onChange={set("min_deposit")} type="number" />
-              <Field label="Nạp tối đa ($)" id="max_deposit" value={form.max_deposit || "10000"} onChange={set("max_deposit")} type="number" />
-            </SettingsSection>
-            <SettingsSection title="Thẻ cào điện thoại (gachthefast.com)" icon={<span className="text-base">📱</span>}>
-              <p className="text-xs text-muted-foreground">Đăng ký đối tác tại <a href="https://gachthefast.com" target="_blank" rel="noopener noreferrer" className="underline text-primary">gachthefast.com</a> để lấy Partner ID và Partner Key.</p>
-              <Field label="Partner ID" id="card_partner_id" value={form.card_partner_id || ""} onChange={set("card_partner_id")} placeholder="Partner ID từ gachthefast.com" />
-              <Field label="Partner Key" id="card_partner_key" value={form.card_partner_key || ""} onChange={set("card_partner_key")} sensitive placeholder="Partner Key từ gachthefast.com" />
-              <div className="space-y-1">
-                <p className="text-xs font-medium">Callback URL (nhập vào gachthefast.com):</p>
-                <div className="flex items-center gap-2 bg-muted border rounded px-3 py-2 font-mono text-xs break-all">
-                  <span className="flex-1 select-all">{`${window.location.origin}/api/wallet/cards/callback`}</span>
-                  <button type="button" className="shrink-0 hover:text-primary transition-colors"
-                    onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/wallet/cards/callback`)}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                  </button>
-                </div>
-              </div>
-            </SettingsSection>
-            <SettingsSection title="GachTheFast - Kiểm tra lịch sử nhận tiền" icon={<span className="text-base">🏦</span>}>
-              <p className="text-xs text-muted-foreground">
+
+            {form.payment_method === "sepay" && (
+              <>
+                <SettingsSection title="SePay Webhook" icon={<Zap className="w-4 h-4" />}>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium">Webhook URL (nhập vào SePay Dashboard → Webhook):</p>
+                    <div className="flex items-center gap-2 bg-muted border rounded px-3 py-2 font-mono text-xs break-all">
+                      <span className="flex-1 select-all">{`${window.location.origin}/api/webhooks/sepay`}</span>
+                      <button type="button" className="shrink-0 hover:text-primary transition-colors"
+                        onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/sepay`)}>
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <Field label="SePay Webhook Secret" id="sepay_webhook_secret" value={form.sepay_webhook_secret || ""} onChange={set("sepay_webhook_secret")} sensitive description="Cấu hình trong SePay Dashboard → Webhook" />
+                  <div className="flex items-center gap-3">
+                    <Switch checked={form.sepay_enabled === "true"} onCheckedChange={() => toggle("sepay_enabled")} id="sepay_enabled" />
+                    <Label htmlFor="sepay_enabled" className="text-green-600 font-medium">Bật SePay tự động xác nhận nạp tiền</Label>
+                  </div>
+                </SettingsSection>
+              </>
+            )}
+
+            {form.payment_method === "thueapibank" && (
+              <>
+                <SettingsSection title="ThueAPIBank - API Credentials" icon={<Zap className="w-4 h-4" />}>
+                  <p className="text-xs text-muted-foreground mb-3">Đăng ký tài khoản tại <a href="https://thueapibank.com" target="_blank" rel="noopener noreferrer" className="underline text-primary">thueapibank.com</a></p>
+                  <Field label="ThueAPIBank Account ID" id="thueapibank_account_id" value={form.thueapibank_account_id || ""} onChange={set("thueapibank_account_id")} placeholder="Your Account ID" />
+                  <Field label="ThueAPIBank API Key" id="thueapibank_api_key" value={form.thueapibank_api_key || ""} onChange={set("thueapibank_api_key")} sensitive placeholder="Your API Key" />
+                  <Field label="ThueAPIBank Webhook Secret" id="thueapibank_webhook_secret" value={form.thueapibank_webhook_secret || ""} onChange={set("thueapibank_webhook_secret")} sensitive description="Callback secret từ ThueAPIBank" />
+                  <div className="flex items-center gap-3">
+                    <Switch checked={form.thueapibank_enabled === "true"} onCheckedChange={() => toggle("thueapibank_enabled")} id="thueapibank_enabled" />
+                    <Label htmlFor="thueapibank_enabled" className="text-green-600 font-medium">Bật ThueAPIBank kiểm tra tự động</Label>
+                  </div>
+                </SettingsSection>
+              </>
+            )}
+
+            <SettingsSection title="GachTheFast - Tự động duyệt nạp tiền" icon={<Zap className="w-4 h-4" />}>
+              <p className="text-xs text-muted-foreground mb-3">
                 Tự động duyệt nạp tiền chuyển khoản bằng cách polling lịch sử giao dịch từ{" "}
                 <a href="https://gachthefast.com" target="_blank" rel="noopener noreferrer" className="underline text-primary">gachthefast.com</a>.
                 Chữ ký: <code className="bg-muted px-1 rounded text-xs">md5(partner_key + partner_id)</code>.
@@ -529,23 +557,32 @@ export default function AdminSettings() {
             <SettingsSection title="Cron Secret" description="Bảo vệ link tự động cập nhật" icon={<Lock className="w-4 h-4" />}>
               <Field label="Cron Secret Key" id="cron_secret" value={form.cron_secret || ""} onChange={set("cron_secret")} sensitive placeholder="MySecretCron2025!" description="Key để bảo vệ các Cron Links bên dưới" />
               {form.cron_secret && (
-                <div className="space-y-2 mt-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cron Links (dùng cho cron-job.org):</p>
-                  {[
-                    { label: "Đồng bộ tất cả dịch vụ", path: "/api/cron/sync-all" },
-                    { label: "Cập nhật trạng thái đơn hàng", path: "/api/cron/update-orders" },
-                  ].map(({ label, path }) => (
-                    <div key={path} className="text-xs space-y-0.5">
-                      <p className="text-muted-foreground">{label}:</p>
-                      <div className="flex items-center gap-2 bg-muted border rounded px-3 py-2 font-mono break-all">
-                        <span className="flex-1 select-all">{`${window.location.origin}${path}?secret=${form.cron_secret}`}</span>
-                        <button type="button" className="shrink-0 hover:text-primary transition-colors"
-                          onClick={() => navigator.clipboard.writeText(`${window.location.origin}${path}?secret=${form.cron_secret}`)}>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                        </button>
+                <div className="space-y-3 mt-3">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">📋 Tất cả Cron Links (copy vào cron-job.org):</p>
+                  <div className="space-y-2">
+                    {[
+                      { label: "🔄 Đồng bộ TẤT CẢ dịch vụ từ provider", path: "/api/cron/sync-all", info: "Chạy mỗi 6 giờ" },
+                      { label: "📊 Cập nhật trạng thái đơn hàng", path: "/api/cron/update-orders", info: "Chạy mỗi 10 phút" },
+                      { label: "🎮 Kiểm tra Gachthefast (thẻ cào)", path: "/api/cron/gachthefast-check", info: "Chạy mỗi 5 phút" },
+                      { label: "🔗 Đồng bộ riêng provider (thay :id)", path: "/api/cron/sync/:id", info: "VD: /api/cron/sync/1" },
+                    ].map(({ label, path, info }) => (
+                      <div key={path} className="space-y-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-medium">{label}</p>
+                            <p className="text-xs text-muted-foreground">{info}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 bg-background border border-border/50 rounded px-3 py-2 font-mono text-xs overflow-x-auto">
+                          <span className="flex-1 select-all text-nowrap">{`${window.location.origin}${path}?secret=${form.cron_secret}`}</span>
+                          <button type="button" className="shrink-0 hover:text-primary transition-colors p-1"
+                            onClick={() => { navigator.clipboard.writeText(`${window.location.origin}${path}?secret=${form.cron_secret}`); toast({ title: "Đã sao chép link!" }); }}>
+                            <Copy className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </SettingsSection>

@@ -1,10 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
-import { useRegister } from "@workspace/api-client-react";
+import { useRegister, useGetMe } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -26,6 +26,14 @@ export default function Register() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const registerMut = useRegister();
+  const { data: user, isLoading: userLoading } = useGetMe();
+
+  useEffect(() => {
+    if (!userLoading && user) {
+      setLocation("/dashboard");
+    }
+  }, [user, userLoading, setLocation]);
+
   const [showPassword, setShowPassword] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<any>(null);

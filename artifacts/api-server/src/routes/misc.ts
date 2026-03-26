@@ -135,7 +135,7 @@ async function syncOneProvider(provider: typeof providersTable.$inferSelect): Pr
   const markup = 1 + (Number(provider.markupPercent) || 25) / 100;
   try {
     const resp = await callProviderApi(provider.baseUrl, provider.apiKey, { action: "services" }, 90000);
-    const services: any[] = await resp.json();
+    const services: any[] = await resp.json() as any[];
     if (!Array.isArray(services)) return { added: 0, updated: 0, total: 0, error: "Provider không trả về danh sách" };
 
     // Category cache by name — creates from provider's own category field
@@ -192,7 +192,7 @@ function verifyCronSecret(provided: unknown, expected: string): boolean {
     const a = Buffer.from(provided.padEnd(expected.length));
     const b = Buffer.from(expected);
     if (a.length !== b.length) return false;
-    return require("crypto").timingSafeEqual(a, b);
+    return crypto.timingSafeEqual(a, b);
   } catch { return false; }
 }
 
@@ -243,6 +243,7 @@ router.get("/cron/sync-all", async (req, res) => {
         console.error("[cron/sync-all] background error:", e.message);
       }
     });
+    return;
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }

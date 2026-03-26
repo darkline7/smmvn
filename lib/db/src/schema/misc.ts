@@ -5,6 +5,7 @@ import { z } from "zod/v4";
 export const announcementTypeEnum = pgEnum("announcement_type", ["info", "warning", "maintenance", "success"]);
 export const notificationTypeEnum = pgEnum("notification_type", ["system", "order", "ticket", "deposit"]);
 export const apiLogStatusEnum = pgEnum("api_log_status", ["success", "error"]);
+export const auditStatusEnum = pgEnum("audit_status", ["success", "failed"]);
 
 export const announcementsTable = pgTable("announcements", {
   id: serial("id").primaryKey(),
@@ -77,3 +78,20 @@ export const cardChargesTable = pgTable("card_charges", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 export type CardCharge = typeof cardChargesTable.$inferSelect;
+
+// ── Audit Logs ────────────────────────────────────────────────────────────────
+// Track admin actions for security & compliance
+export const auditLogsTable = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),          // Who performed the action
+  resource: text("resource").notNull(),           // What resource (user, order, settings)
+  action: text("action").notNull(),               // What action (create, update, delete)
+  resourceId: text("resource_id"),                // ID of resource being acted upon
+  details: jsonb("details"),                      // Additional context (old/new values)
+  status: auditStatusEnum("status").notNull(),    // success or failed
+  errorMessage: text("error_message"),            // If failed, what was the error
+  ip: text("ip_address"),                         // Client IP
+  userAgent: text("user_agent"),                  // Client user agent
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export type AuditLog = typeof auditLogsTable.$inferSelect;

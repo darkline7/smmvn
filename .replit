@@ -31,4 +31,7 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-JWT_SECRET = "4d413914403ea294d80ac8d428ade533d63ad12564d5c2ab88d6e8fb9a5acbb52a4281b7a54a48778a7fa20a68988ece4e6f12b8541ec219fb7c064e3df368b8"
+# JWT_SECRET should be set in Replit Secrets, not here!
+# Generate: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+JWT_SECRET = ""
+DATABASE_URL = ""

@@ -27,7 +27,10 @@ export default function Referrals() {
   });
 
   const referrals = data?.referrals || [];
-  const totalCommission = referrals.reduce((s: number, r: any) => s + Number(r.commission || 0), 0);
+  const history = data?.history || [];
+  const totalCommission = data?.totalCommission || 0;
+  const commissionRate = data?.commissionRate || 0;
+  const commissionPercent = Math.round(commissionRate * 100);
   const refLink = `${window.location.origin}/register?ref=${me?.username || ""}`;
 
   const copy = () => {
@@ -49,7 +52,7 @@ export default function Referrals() {
           {[
             { label: "Tổng giới thiệu", value: referrals.length, icon: Users, color: "from-blue-500 to-cyan-600" },
             { label: "Tổng hoa hồng", value: formatCurrency(totalCommission), icon: DollarSign, color: "from-green-500 to-emerald-600" },
-            { label: "Tỉ lệ hoa hồng", value: "5%", icon: TrendingUp, color: "from-violet-500 to-purple-600" },
+            { label: "Tỉ lệ hoa hồng", value: `${commissionPercent}%`, icon: TrendingUp, color: "from-violet-500 to-purple-600" },
           ].map(({ label, value, icon: Icon, color }) => (
             <Card key={label} className="border-border/50 shadow-sm relative overflow-hidden">
               <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${color} opacity-10 rounded-full -mr-6 -mt-6`}></div>
@@ -71,7 +74,7 @@ export default function Referrals() {
         <Card className="border-primary/30 bg-primary/5 shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Gift className="w-5 h-5 text-primary" />Link giới thiệu của bạn</CardTitle>
-            <CardDescription>Chia sẻ link này để nhận 5% hoa hồng từ mỗi đơn hàng của người bạn giới thiệu</CardDescription>
+            <CardDescription>Chia sẻ link này để nhận {commissionPercent}% hoa hồng từ mỗi đơn hàng của người bạn giới thiệu</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-2 p-3 bg-background rounded-xl border font-mono text-sm">
@@ -85,7 +88,7 @@ export default function Referrals() {
               {[
                 { step: "1", text: "Chia sẻ link giới thiệu" },
                 { step: "2", text: "Bạn bè đăng ký và đặt hàng" },
-                { step: "3", text: "Nhận 5% hoa hồng tự động" },
+                { step: "3", text: `Nhận ${commissionPercent}% hoa hồng tự động` },
               ].map(({ step, text }) => (
                 <div key={step} className="text-center p-3 rounded-xl bg-background border">
                   <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm mx-auto mb-2">{step}</div>
@@ -108,14 +111,14 @@ export default function Referrals() {
               </div>
             ) : (
               <div className="divide-y">
-                {referrals.map((r: any) => (
-                  <div key={r.id} className="flex items-center justify-between p-4">
+                {history.map((r: any) => (
+                  <div key={`${r.userId}-${r.createdAt}`} className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
-                        {r.referredUserId}
+                        {r.userId}
                       </div>
                       <div>
-                        <p className="font-medium text-sm">User #{r.referredUserId}</p>
+                        <p className="font-medium text-sm">{r.username}</p>
                         <p className="text-xs text-muted-foreground">{format(new Date(r.createdAt), "dd/MM/yyyy")}</p>
                       </div>
                     </div>

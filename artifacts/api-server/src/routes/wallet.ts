@@ -6,6 +6,7 @@ import { requireAuth } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
 import { z } from "zod";
 import crypto from "crypto";
+import { toUserMessage } from "../lib/errors.js";
 
 const router = Router();
 

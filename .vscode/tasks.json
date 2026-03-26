@@ -1,0 +1,69 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "delete-targz-root",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"Remove-Item -LiteralPath \"Sales-Flow-Accelerator_20260322_154934.tar.gz\",\"smm-panel-cpanel-mvc.tar.gz\",\"smm-panel-cpanel-php.tar.gz\",\"smm-panel-cpanel.tar.gz\",\"smm-panel-pro-FULL.tar.gz\",\"smm-panel-pro-source.tar.gz\" -Force"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "delete-targz-unlocked",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"Remove-Item -LiteralPath \"smm-panel-cpanel-mvc.tar.gz\",\"smm-panel-cpanel-php.tar.gz\",\"smm-panel-cpanel.tar.gz\",\"smm-panel-pro-FULL.tar.gz\",\"smm-panel-pro-source.tar.gz\" -Force"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "db-push-now",
+			"type": "shell",
+			"command": "pnpm.cmd",
+			"args": [
+				"--filter",
+				"@workspace/db",
+				"run",
+				"push"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "run-api-dev",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"$envFile='artifacts/api-server/.env'; Get-Content $envFile | ForEach-Object { if ($_ -match '^\\s*#' -or $_ -notmatch '=') { return }; $parts = $_.Split('=',2); Set-Item -Path (\"Env:\" + $parts[0]) -Value $parts[1] }; pnpm.cmd --filter @workspace/api-server run dev"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "run-api-dev-inline-env",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"$env:DATABASE_URL='postgresql://postgres:password@localhost:5432/smm_panel'; $env:JWT_SECRET='change_this_to_a_random_64_char_secret_string_for_local_dev'; $env:SITE_URL='http://localhost:5173'; $env:NODE_ENV='development'; $env:PORT='3000'; pnpm.cmd --filter @workspace/api-server run dev"
+			],
+			"isBackground": true
+		}
+	]
+}

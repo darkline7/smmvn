@@ -55,8 +55,8 @@ function TicketDetail({ ticketId }: { ticketId: number }) {
   };
 
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Đang tải...</div>;
-  const ticket = data?.ticket || data;
-  const messages = data?.messages || [];
+  const ticket = (data as any)?.ticket || data;
+  const messages = (data as any)?.messages || [];
 
   return (
     <div className="space-y-4 max-h-[60vh] flex flex-col">

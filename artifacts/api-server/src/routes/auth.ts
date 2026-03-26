@@ -5,8 +5,10 @@ import { eq, or } from "drizzle-orm";
 import { hashPassword, verifyPassword, generateApiKey, generateReferralCode } from "../lib/auth.js";
 import { setSession, getSession } from "../app.js";
 import { authRateLimit } from "../lib/rate-limits.js";
+import { emailSchema, passwordSchema, usernameSchema } from "../lib/validate.js";
 import { z } from "zod";
 import crypto from "crypto";
+import { toUserMessage } from "../lib/errors.js";
 
 const router = Router();
 
@@ -38,16 +40,16 @@ async function verifyTurnstile(token: string, secretKey: string): Promise<boolea
 }
 
 const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6).max(128),
-  username: z.string().min(3).max(30),
-  referralCode: z.string().optional(),
+  email: emailSchema,
+  password: passwordSchema,
+  username: usernameSchema,
+  referralCode: z.string().max(10).optional(),
   turnstileToken: z.string().optional(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string(),
+  email: emailSchema,
+  password: z.string().min(1),
   turnstileToken: z.string().optional(),
 });
 

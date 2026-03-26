@@ -1,10 +1,10 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
-import { useLogin } from "@workspace/api-client-react";
+import { useLogin, useGetMe } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -23,6 +23,14 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const loginMut = useLogin();
+  const { data: user, isLoading: userLoading } = useGetMe();
+
+  useEffect(() => {
+    if (!userLoading && user) {
+      setLocation("/dashboard");
+    }
+  }, [user, userLoading, setLocation]);
+
   const [showPass, setShowPass] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<any>(null);

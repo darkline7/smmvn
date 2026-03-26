@@ -16,7 +16,7 @@ export default function AdminApiLogs() {
     page, limit: 20,
     ...(action !== "all" ? { action } : {}),
     ...(status !== "all" ? { status } : {}),
-  });
+  } as any);
   const logs = data?.logs || [];
   const totalPages = data?.totalPages || 1;
 

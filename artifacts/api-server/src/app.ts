@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 import path from "path";
 import { fileURLToPath } from "url";
 import { existsSync } from "fs";
+import { auditMiddleware } from "./lib/audit.js";
 import router from "./routes/index.js";
 
 // ── __dirname shim ─────────────────────────────────────────────────────────────
@@ -66,14 +67,34 @@ app.use(cors({
 
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use(helmet({
-  contentSecurityPolicy: false, // Managed separately / by reverse proxy
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"], // Vite requires unsafe-inline in dev
+      styleSrc: ["'self'", "'unsafe-inline'"],   // Tailwind requires unsafe-inline
+      imgSrc: ["'self'", "data:", "https:"],
+      fontSrc: ["'self'", "data:"],
+      connectSrc: ["'self'", process.env.SITE_URL || "http://localhost:5173"],
+      frameSrc: ["'none'"],     // No iframes
+      objectSrc: ["'none'"],    // No plugins
+      mediaSrc: ["'none'"],     // No media
+      baseUri: ["'self'"],
+      formAction: ["'self'"],   // Forms can only submit to self
+      ...(process.env.NODE_ENV === "production" && {
+        upgradeInsecureRequests: [],
+      }),
+    },
+  },
   crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Needed for some CDNs
 }));
 app.use((_req: Request, res: Response, next: NextFunction) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   next();
 });
 
@@ -81,6 +102,47 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(cookieParser());
+
+// ── CSRF Protection (Simple Origin/Referer check) ──────────────────────────────
+// Only check for state-changing requests (POST, PUT, DELETE, PATCH)
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    return next();
+  }
+
+  // Allow requests from API itself (for cron jobs, webhooks)
+  if (!req.headers.origin && !req.headers.referer) {
+    // Server-to-server requests
+    return next();
+  }
+
+  const allowedOrigins = [
+    ALLOWED_ORIGIN,
+    process.env.SITE_URL,
+    `http://localhost:5173`,
+    `http://localhost:3000`,
+  ].filter(Boolean);
+
+  const origin = req.headers.origin || req.headers.referer?.split("/").slice(0, 3).join("/");
+  const originHost = (() => {
+    try { return origin ? new URL(origin).origin : null; } catch { return null; }
+  })();
+
+  const isAllowed = allowedOrigins.some((a) => {
+    if (!a) return false;
+    try {
+      const aOrigin = new URL(a).origin;
+      return originHost === aOrigin;
+    } catch { return false; }
+  });
+
+  if (!isAllowed && req.headers.origin) {
+    console.warn(`[CSRF] Rejected request from origin: ${req.headers.origin}`);
+    return res.status(403).json({ error: "CSRF validation failed" });
+  }
+
+  next();
+});
 
 // ── Global rate limiting ──────────────────────────────────────────────────────
 app.use("/api", rateLimit({
@@ -93,6 +155,9 @@ app.use("/api", rateLimit({
     req.path.startsWith("/api/public/") ||
     req.path.startsWith("/api/health"),
 }));
+
+// ── Audit middleware (attach IP & user-agent to request) ──────────────────────
+app.use(auditMiddleware as any);
 
 // ── JWT session middleware ────────────────────────────────────────────────────
 interface SessionData {

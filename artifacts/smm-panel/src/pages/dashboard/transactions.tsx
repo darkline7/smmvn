@@ -21,7 +21,7 @@ export default function Transactions() {
   const [page, setPage] = useState(1);
   const [type, setType] = useState<string>("all");
   const { data: balance } = useGetBalance();
-  const { data, isLoading, refetch } = useListTransactions({ page, limit: 20, ...(type !== "all" ? { type } : {}) });
+  const { data, isLoading, refetch } = useListTransactions({ page, limit: 20, ...(type !== "all" ? { type } : {}) } as any);
 
   const transactions = data?.transactions || [];
   const totalPages = data?.totalPages || 1;

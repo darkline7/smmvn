@@ -13,7 +13,7 @@ const router = Router();
 
 // ─── Helper: check if domain CNAME points to our server ─────────────────────
 async function checkNS(domain: string): Promise<boolean> {
-  const HOST = (process.env.REPLIT_DOMAINS?.split(",")[0] || "vietool.cc").trim();
+  const HOST = ((process.env.REPLIT_DOMAINS?.split(",")[0]) || "vietool.cc").trim() as string;
   try {
     const cnames = await resolveCname(domain);
     return cnames.some(c => c.includes(HOST) || c.includes("replit.app") || c.includes("replit.dev"));
@@ -84,7 +84,7 @@ router.post("/", requireAuth as any, async (req: AuthRequest, res: any) => {
     const existing = await db.select().from(subdomainsTable).where(eq(subdomainsTable.domain, clean)).limit(1);
     if (existing.length > 0) return res.status(409).json({ error: "Tên miền đã được đăng ký" });
 
-    const HOST = process.env.REPLIT_DOMAINS?.split(",")[0] || "vietool.cc";
+    const HOST = ((process.env.REPLIT_DOMAINS?.split(",")[0]) || "vietool.cc") as string;
     const [row] = await db.insert(subdomainsTable).values({
       userId: req.userId!,
       domain: clean,
@@ -104,7 +104,7 @@ router.post("/", requireAuth as any, async (req: AuthRequest, res: any) => {
 // ─── DELETE /api/subdomains/:id ──────────────────────────────────────────────
 router.delete("/:id", requireAuth as any, async (req: AuthRequest, res: any) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [row] = await db.select().from(subdomainsTable).where(eq(subdomainsTable.id, id)).limit(1);
     if (!row) return res.status(404).json({ error: "Không tìm thấy" });
     if (row.userId !== req.userId) return res.status(403).json({ error: "Không có quyền" });

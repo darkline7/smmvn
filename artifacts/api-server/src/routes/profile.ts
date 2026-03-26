@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { requireAuth, hashPassword, verifyPassword, generateApiKey } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
 import { z } from "zod";
+import { toUserMessage } from "../lib/errors.js";
 
 const router = Router();
 

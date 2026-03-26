@@ -88,7 +88,7 @@ export default function SubdomainsPage() {
             <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
               <li>Đăng nhập vào nhà cung cấp tên miền (Namecheap, Cloudflare, GoDaddy…)</li>
               <li>Vào phần quản lý <strong className="text-foreground">DNS Records</strong></li>
-              <li>Thêm bản ghi <strong className="text-foreground">CNAME</strong> trỏ về địa chỉ máy chủ bên dưới</li>
+              <li>Thêm bản ghi <strong className="text-foreground">CNAME</strong> trỏ về máy chủ của bạn</li>
               <li>Nhấn <strong className="text-foreground">Thêm domain</strong> và điền tên miền của bạn</li>
               <li>Chờ admin duyệt (thường trong 1–2 giờ) — DNS mất 24–48h để lan truyền</li>
             </ol>
@@ -108,26 +108,20 @@ export default function SubdomainsPage() {
                     <tr>
                       <td className="py-1.5 pr-4 font-mono font-bold text-primary">CNAME</td>
                       <td className="py-1.5 pr-4 font-mono">smm (hoặc @)</td>
-                      <td className="py-1.5 font-mono">smmvn.replit.app</td>
+                      <td className="py-1.5 font-mono">smm.yourdomain.com (tên miền của bạn)</td>
                     </tr>
                     <tr className="text-muted-foreground">
                       <td className="py-1.5 pr-4 font-mono">CNAME</td>
                       <td className="py-1.5 pr-4 font-mono">* (wildcard)</td>
-                      <td className="py-1.5 font-mono">smmvn.replit.app</td>
+                      <td className="py-1.5 font-mono">smm.yourdomain.com (hoặc máy chủ chính)</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-xs text-muted-foreground flex-1">
-                  Dùng <strong>wildcard CNAME (*)</strong> nếu muốn tất cả subdomain đều trỏ về hệ thống.
+                  Dùng <strong>wildcard CNAME (*)</strong> nếu muốn tất cả subdomain đều hoạt động.
                 </p>
-                <button
-                  className="text-xs text-primary hover:underline flex items-center gap-1 shrink-0"
-                  onClick={() => { navigator.clipboard.writeText("smmvn.replit.app"); toast({ title: "Đã sao chép địa chỉ máy chủ!" }); }}
-                >
-                  <Copy className="w-3 h-3" /> Sao chép
-                </button>
               </div>
             </div>
           </CardContent>

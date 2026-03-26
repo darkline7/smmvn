@@ -11,6 +11,8 @@ import { requireAdmin } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
 import { z } from "zod";
 import { sendTelegramMessage } from "../lib/telegram.js";
+import { toUserMessage } from "../lib/errors.js";
+import { auditLog } from "../lib/audit.js";
 
 const router = Router();
 router.use(requireAdmin as any);
@@ -119,10 +121,33 @@ router.patch("/users/:id", async (req: AuthRequest, res: any) => {
   if (username !== undefined) updates.username = String(username).slice(0, 30);
   if (role !== undefined) updates.role = role;
   if (banned !== undefined) updates.banned = Boolean(banned);
-  const updated = await db.update(usersTable).set(updates).where(eq(usersTable.id, Number(req.params.id))).returning();
-  if (!updated[0]) return res.status(404).json({ error: "Not found" });
-  const { passwordHash, ...safeUser } = updated[0];
-  return res.json(safeUser);
+  
+  try {
+    const updated = await db.update(usersTable).set(updates).where(eq(usersTable.id, Number(req.params.id))).returning();
+    if (!updated[0]) return res.status(404).json({ error: "Not found" });
+    
+    const auditData = (req as any)._audit || {};
+    await auditLog(req.userId!, {
+      resource: "user",
+      action: "update",
+      resourceId: req.params.id,
+      details: { changes: updates, userId: Number(req.params.id) },
+      status: "success",
+    }, auditData.ip, auditData.userAgent);
+    
+    const { passwordHash, ...safeUser } = updated[0];
+    return res.json(safeUser);
+  } catch (err) {
+    const auditData = (req as any)._audit || {};
+    await auditLog(req.userId!, {
+      resource: "user",
+      action: "update",
+      resourceId: req.params.id,
+      status: "failed",
+      errorMessage: err instanceof Error ? err.message : String(err),
+    }, auditData.ip, auditData.userAgent);
+    throw err;
+  }
 });
 
 router.post("/users/:id/balance", async (req: AuthRequest, res: any) => {
@@ -139,8 +164,26 @@ router.post("/users/:id/balance", async (req: AuthRequest, res: any) => {
       await tx.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, userId));
       await tx.insert(transactionsTable).values({ userId, type: "adjustment", amount: amount.toFixed(4), balanceAfter: newBalance.toFixed(4), description: note || "Admin adjustment" });
     });
+    
+    const auditData = (req as any)._audit || {};
+    await auditLog(req.userId!, {
+      resource: "user",
+      action: "balance_adjustment",
+      resourceId: req.params.id,
+      details: { amount, note, oldBalance: "N/A" },
+      status: "success",
+    }, auditData.ip, auditData.userAgent);
+    
     return res.json({ success: true, message: "Balance adjusted" });
   } catch (e: any) {
+    const auditData = (req as any)._audit || {};
+    await auditLog(req.userId!, {
+      resource: "user",
+      action: "balance_adjustment",
+      resourceId: req.params.id,
+      status: "failed",
+      errorMessage: e instanceof Error ? e.message : String(e),
+    }, auditData.ip, auditData.userAgent);
     return res.status(400).json({ error: toUserMessage(e) });
   }
 });
@@ -204,7 +247,26 @@ router.get("/services", async (req: AuthRequest, res: any) => {
   if (status) conditions.push(eq(servicesTable.status, status as any));
   const where = conditions.length ? and(...conditions) : undefined;
   const services = await db.select({
-    ...servicesTable,
+    id: servicesTable.id,
+    categoryId: servicesTable.categoryId,
+    name: servicesTable.name,
+    providerId: servicesTable.providerId,
+    providerServiceId: servicesTable.providerServiceId,
+    type: servicesTable.type,
+    rate: servicesTable.rate,
+    min: servicesTable.min,
+    max: servicesTable.max,
+    description: servicesTable.description,
+    averageTime: servicesTable.averageTime,
+    refill: servicesTable.refill,
+    cancel: servicesTable.cancel,
+    dripfeed: servicesTable.dripfeed,
+    subscriptions: servicesTable.subscriptions,
+    sortOrder: servicesTable.sortOrder,
+    status: servicesTable.status,
+    tags: servicesTable.tags,
+    createdAt: servicesTable.createdAt,
+    updatedAt: servicesTable.updatedAt,
     categoryName: sql<string>`(SELECT name FROM categories WHERE id = services.category_id)`,
     providerName: sql<string>`(SELECT name FROM providers WHERE id = services.provider_id)`,
   }).from(servicesTable).where(where).orderBy(servicesTable.sortOrder, servicesTable.name);
@@ -217,7 +279,7 @@ router.post("/services", async (req: AuthRequest, res: any) => {
     if (!name || !categoryId || rate === undefined || min === undefined || max === undefined) {
       return res.status(400).json({ error: "name, categoryId, rate, min, max are required" });
     }
-    const VALID_SERVICE_STATUSES = ["active", "inactive", "disabled"];
+    const VALID_SERVICE_STATUSES = ["active", "inactive"];
     const [service] = await db.insert(servicesTable).values({
       name: String(name).slice(0, 200),
       categoryId: Number(categoryId),
@@ -228,7 +290,6 @@ router.post("/services", async (req: AuthRequest, res: any) => {
       min: Number(min),
       max: Number(max),
       description: description ? String(description).slice(0, 2000) : null,
-      features: Array.isArray(features) ? features : [],
       sortOrder: sortOrder ? Number(sortOrder) : 0,
       status: VALID_SERVICE_STATUSES.includes(status) ? status : "active",
     }).returning();
@@ -239,8 +300,8 @@ router.post("/services", async (req: AuthRequest, res: any) => {
 });
 
 router.patch("/services/:id", async (req: AuthRequest, res: any) => {
-  const VALID_SERVICE_STATUSES = ["active", "inactive", "disabled"];
-  const { name, categoryId, providerId, providerServiceId, type, rate, min, max, description, features, sortOrder, status } = req.body;
+  const VALID_SERVICE_STATUSES = ["active", "inactive"];
+  const { name, categoryId, providerId, providerServiceId, type, rate, min, max, description, sortOrder, status } = req.body;
   const updates: any = { updatedAt: new Date() };
   if (name !== undefined) updates.name = String(name).slice(0, 200);
   if (categoryId !== undefined) updates.categoryId = Number(categoryId);
@@ -251,7 +312,6 @@ router.patch("/services/:id", async (req: AuthRequest, res: any) => {
   if (min !== undefined) updates.min = Number(min);
   if (max !== undefined) updates.max = Number(max);
   if (description !== undefined) updates.description = description ? String(description).slice(0, 2000) : null;
-  if (features !== undefined) updates.features = Array.isArray(features) ? features : [];
   if (sortOrder !== undefined) updates.sortOrder = Number(sortOrder);
   if (status !== undefined) updates.status = VALID_SERVICE_STATUSES.includes(status) ? status : "active";
   const updated = await db.update(servicesTable).set(updates).where(eq(servicesTable.id, Number(req.params.id))).returning();
@@ -392,7 +452,7 @@ async function syncProviderServices(provider: any): Promise<{ added: number; upd
   const markup = 1 + (Number(provider.markupPercent) || 25) / 100;
   try {
     const resp = await callProviderApi(provider.baseUrl, provider.apiKey, { action: "services" }, 90000);
-    const services: any[] = await resp.json();
+    const services: any[] = await resp.json() as any[];
     if (!Array.isArray(services)) return { added: 0, updated: 0, total: 0, error: "Provider không trả về danh sách dịch vụ" };
 
     // Cache category IDs by category name to avoid N+1 queries
@@ -533,8 +593,26 @@ router.post("/payments/:id/approve", async (req: AuthRequest, res: any) => {
       await tx.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, deposit[0].userId));
       await tx.insert(transactionsTable).values({ userId: deposit[0].userId, type: "deposit", amount: amount.toFixed(4), balanceAfter: newBalance.toFixed(4), description: `Deposit approved #${deposit[0].id}`, referenceId: deposit[0].id });
     });
+    
+    const auditData = (req as any)._audit || {};
+    await auditLog(req.userId!, {
+      resource: "deposit",
+      action: "approve",
+      resourceId: req.params.id,
+      details: { amount, userId: deposit[0].userId, note: req.body?.note },
+      status: "success",
+    }, auditData.ip, auditData.userAgent);
+    
     return res.json({ success: true, message: "Deposit approved" });
   } catch (e: any) {
+    const auditData = (req as any)._audit || {};
+    await auditLog(req.userId!, {
+      resource: "deposit",
+      action: "approve",
+      resourceId: req.params.id,
+      status: "failed",
+      errorMessage: e instanceof Error ? e.message : String(e),
+    }, auditData.ip, auditData.userAgent);
     return res.status(400).json({ error: toUserMessage(e) });
   }
 });
@@ -543,8 +621,31 @@ router.post("/payments/:id/reject", async (req: AuthRequest, res: any) => {
   const deposit = await db.select().from(depositsTable).where(eq(depositsTable.id, Number(req.params.id))).limit(1);
   if (!deposit[0]) return res.status(404).json({ error: "Not found" });
   if (deposit[0].status !== "pending") return res.status(400).json({ error: "Deposit already processed" });
-  await db.update(depositsTable).set({ status: "rejected", adminNote: req.body?.reason, updatedAt: new Date() }).where(eq(depositsTable.id, deposit[0].id));
-  return res.json({ success: true, message: "Deposit rejected" });
+  
+  try {
+    await db.update(depositsTable).set({ status: "rejected", adminNote: req.body?.reason, updatedAt: new Date() }).where(eq(depositsTable.id, deposit[0].id));
+    
+    const auditData = (req as any)._audit || {};
+    await auditLog(req.userId!, {
+      resource: "deposit",
+      action: "reject",
+      resourceId: req.params.id,
+      details: { userId: deposit[0].userId, reason: req.body?.reason },
+      status: "success",
+    }, auditData.ip, auditData.userAgent);
+    
+    return res.json({ success: true, message: "Deposit rejected" });
+  } catch (e: any) {
+    const auditData = (req as any)._audit || {};
+    await auditLog(req.userId!, {
+      resource: "deposit",
+      action: "reject",
+      resourceId: req.params.id,
+      status: "failed",
+      errorMessage: e instanceof Error ? e.message : String(e),
+    }, auditData.ip, auditData.userAgent);
+    return res.status(400).json({ error: toUserMessage(e) });
+  }
 });
 
 // TICKETS
@@ -662,20 +763,26 @@ router.get("/settings", async (req: AuthRequest, res: any) => {
 });
 
 const ALLOWED_SETTING_KEYS = new Set([
-  "site_name", "site_url", "logo_url", "favicon_url",
-  "site_description", "support_email", "support_url",
-  "bank_account_name", "bank_account_number", "bank_name", "bank_branch",
-  "min_deposit", "max_deposit", "min_order_amount",
-  "vnd_exchange_rate", "referral_commission", "referral_bonus",
-  "telegram_bot_token", "telegram_admin_chat_id",
-  "card_partner_id", "card_partner_key",
-  "sepay_webhook_secret", "sepay_account_number",
-  "thueapibank_signature", "thueapibank_enabled",
-  "google_client_id", "google_client_secret",
-  "smtp_host", "smtp_port", "smtp_user", "smtp_pass", "smtp_from",
-  "turnstile_site_key", "turnstile_secret_key",
-  "maintenance_mode", "registration_enabled", "maintenance_message",
-  "cron_secret", "order_processing_fee",
+  // GENERAL_KEYS
+  "site_name", "site_description", "site_keywords", "site_author", "support_email", "hotline", "address", "fanpage_url", "timezone", "copyright_left", "copyright_right", "vnd_exchange_rate", "referral_commission", "support_url", "site_url",
+
+  // BRANDING_KEYS
+  "logo_url", "favicon_url",
+
+  // BANK_KEYS
+  "bank_name", "bank_account_number", "bank_account_name", "bank_bin", "sepay_webhook_secret", "sepay_enabled", "min_deposit", "max_deposit", "card_partner_id", "card_partner_key", "gachthefast_partner_id", "gachthefast_partner_key", "gachthefast_enabled", "bank_branch", "sepay_account_number", "thueapibank_signature", "thueapibank_enabled",
+
+  // TELEGRAM_KEYS
+  "telegram_bot_token", "telegram_admin_chat_id", "telegram_notify_new_order", "telegram_notify_new_deposit", "telegram_notify_new_ticket",
+
+  // SMTP_KEYS
+  "smtp_host", "smtp_port", "smtp_secure", "smtp_user", "smtp_pass", "smtp_from_name", "smtp_from_email", "smtp_enabled", "smtp_from",
+
+  // SECURITY_KEYS
+  "google_client_id", "google_client_secret", "google_oauth_enabled", "turnstile_site_key", "turnstile_secret_key", "turnstile_enabled",
+
+  // SYSTEM_KEYS
+  "min_order_balance", "maintenance_mode", "registration_open", "cron_secret", "min_order_amount", "order_processing_fee", "registration_enabled", "maintenance_message",
 ]);
 
 router.patch("/settings", async (req: AuthRequest, res: any) => {

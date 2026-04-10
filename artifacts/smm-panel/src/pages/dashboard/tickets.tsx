@@ -18,9 +18,8 @@ import { format } from "date-fns";
 import { Ticket, Plus, Clock, CheckCircle2, XCircle, MessageCircle, Send, RefreshCw } from "lucide-react";
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
-  open:       { label: "Đang mở",      color: "bg-green-100 text-green-700 border-green-200", icon: Clock },
-  pending:    { label: "Chờ phản hồi", color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: Clock },
-  answered:   { label: "Đã trả lời",   color: "bg-blue-100 text-blue-700 border-blue-200", icon: MessageCircle },
+  open:       { label: "Đang mở",      color: "bg-green-100 text-green-700 border-green-200", icon: MessageCircle },
+  pending:    { label: "Đang chờ hỗ trợ", color: "bg-yellow-100 text-yellow-700 border-yellow-200", icon: Clock },
   closed:     { label: "Đóng",         color: "bg-gray-100 text-gray-600 border-gray-200", icon: XCircle },
 };
 
@@ -158,7 +157,7 @@ export default function Tickets() {
           {[
             { label: "Tổng", value: tickets.length, color: "text-foreground" },
             { label: "Đang mở", value: tickets.filter((t: any) => t.status === "open").length, color: "text-green-600" },
-            { label: "Đã trả lời", value: tickets.filter((t: any) => t.status === "answered").length, color: "text-blue-600" },
+            { label: "Chờ hỗ trợ", value: tickets.filter((t: any) => t.status === "pending").length, color: "text-yellow-600" },
             { label: "Đóng", value: tickets.filter((t: any) => t.status === "closed").length, color: "text-muted-foreground" },
           ].map(({ label, value, color }) => (
             <Card key={label} className="border-border/50 shadow-sm">
@@ -194,8 +193,8 @@ export default function Tickets() {
                       <DialogTrigger asChild>
                         <div className="flex items-center justify-between p-4 hover:bg-muted/30 cursor-pointer transition-colors">
                           <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${t.status === "open" ? "bg-green-100" : t.status === "answered" ? "bg-blue-100" : "bg-gray-100"}`}>
-                              <Icon className={`w-5 h-5 ${t.status === "open" ? "text-green-600" : t.status === "answered" ? "text-blue-600" : "text-gray-500"}`} />
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${t.status === "open" ? "bg-green-100" : t.status === "pending" ? "bg-yellow-100" : "bg-gray-100"}`}>
+                              <Icon className={`w-5 h-5 ${t.status === "open" ? "text-green-600" : t.status === "pending" ? "text-yellow-600" : "text-gray-500"}`} />
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="font-medium truncate">{t.subject}</p>

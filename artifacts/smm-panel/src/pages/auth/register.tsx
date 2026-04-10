@@ -17,7 +17,11 @@ const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
 const registerSchema = z.object({
   username: z.string().min(3, "Username phải ít nhất 3 ký tự").max(30).regex(/^[a-zA-Z0-9_]+$/, "Chỉ dùng chữ, số, gạch dưới"),
   email: z.string().email("Email không hợp lệ"),
-  password: z.string().min(6, "Mật khẩu tối thiểu 6 ký tự"),
+  password: z.string()
+    .min(8, "Mật khẩu tối thiểu 8 ký tự")
+    .regex(/[A-Z]/, "Mật khẩu phải có ít nhất 1 chữ hoa")
+    .regex(/[a-z]/, "Mật khẩu phải có ít nhất 1 chữ thường")
+    .regex(/[0-9]/, "Mật khẩu phải có ít nhất 1 chữ số"),
   confirmPassword: z.string(),
   referralCode: z.string().optional(),
 }).refine(d => d.password === d.confirmPassword, { message: "Mật khẩu xác nhận không khớp", path: ["confirmPassword"] });
@@ -62,6 +66,14 @@ export default function Register() {
     resolver: zodResolver(registerSchema),
     defaultValues: { username: "", email: "", password: "", confirmPassword: "", referralCode: "" },
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      form.setValue("referralCode", ref);
+    }
+  }, [form]);
 
   const onSubmit = (values: z.infer<typeof registerSchema>) => {
     if (authConfig?.turnstileEnabled && !turnstileToken) {
@@ -185,7 +197,7 @@ export default function Register() {
                   <FormLabel>Mật khẩu</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Input type={showPassword ? "text" : "password"} placeholder="Tối thiểu 6 ký tự" {...field} />
+                      <Input type={showPassword ? "text" : "password"} placeholder="Tối thiểu 8 ký tự, gồm hoa thường và số" {...field} />
                       <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>

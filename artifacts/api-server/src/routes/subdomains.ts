@@ -6,8 +6,10 @@ import { requireAuth, requireAdmin } from "../lib/auth.js";
 import type { AuthRequest } from "../lib/auth.js";
 import dns from "dns";
 import { promisify } from "util";
+import { isValidCustomDomain, sanitizeDomainInput, stripPort } from "../lib/domain-utils.js";
 
 const resolveCname = promisify(dns.resolveCname);
+const resolveLookup = promisify(dns.lookup);
 
 const router = Router();
 
@@ -20,11 +22,12 @@ async function checkNS(domain: string): Promise<boolean> {
   } catch {
     // CNAME not found — try A record fallback
     try {
-      const lookup = promisify(dns.lookup);
-      const { address } = await lookup(domain);
-      if (!address) return false;
-      // If we got any address, consider it pointed (admin manually verifies)
-      return true;
+      const [domainResolved, hostResolved] = await Promise.all([
+        resolveLookup(domain, { all: true }),
+        resolveLookup(HOST, { all: true }),
+      ]);
+      const domainAddresses = new Set(domainResolved.map((entry) => entry.address));
+      return hostResolved.some((entry) => domainAddresses.has(entry.address));
     } catch {
       return false;
     }
@@ -35,7 +38,8 @@ async function checkNS(domain: string): Promise<boolean> {
 // Returns branding config for the current request domain (used by frontend)
 router.get("/public-config", async (req: any, res: any) => {
   try {
-    const host = req.hostname;
+    const forwardedHost = typeof req.headers["x-forwarded-host"] === "string" ? req.headers["x-forwarded-host"] : "";
+    const host = stripPort(forwardedHost || req.hostname || "");
     if (!host) return res.json({ isReseller: false });
     const rows = await db
       .select()
@@ -76,8 +80,8 @@ router.post("/", requireAuth as any, async (req: AuthRequest, res: any) => {
     const { domain, siteName, logoUrl, primaryColor } = req.body;
     if (!domain) return res.status(400).json({ error: "Domain là bắt buộc" });
 
-    const clean = domain.toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/$/, "");
-    if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z]{2,})+$/.test(clean)) {
+    const clean = sanitizeDomainInput(domain);
+    if (!isValidCustomDomain(clean)) {
       return res.status(400).json({ error: "Tên miền không hợp lệ" });
     }
 

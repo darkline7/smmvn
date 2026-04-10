@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 // ── Auth endpoints (login, register, password reset) ────────────────────────
 export const authRateLimit = rateLimit({
@@ -11,7 +11,7 @@ export const authRateLimit = rateLimit({
   keyGenerator: (req) => {
     // Rate limit by email (if provided) + IP to prevent email enumeration
     const email = (req.body?.email || "").toLowerCase();
-    return email && email.length > 0 ? `auth:${email}` : req.ip || "unknown";
+    return email && email.length > 0 ? `auth:${email}` : ipKeyGenerator(req.ip || "127.0.0.1");
   },
 });
 
@@ -34,7 +34,7 @@ export const orderRateLimit = rateLimit({
   message: { error: "Quá nhiều đơn hàng. Vui lòng đợi một chút." },
   keyGenerator: (req) => {
     // Use user ID if authenticated, otherwise use IP
-    return req.body?.userId ? `order:${req.body.userId}` : req.ip || "unknown";
+    return req.body?.userId ? `order:${req.body.userId}` : ipKeyGenerator(req.ip || "127.0.0.1");
   },
 });
 

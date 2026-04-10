@@ -305,6 +305,22 @@ export async function runMigrations(): Promise<void> {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS "audit_logs" (
+        "id" serial PRIMARY KEY NOT NULL,
+        "user_id" integer NOT NULL,
+        "resource" text NOT NULL,
+        "action" text NOT NULL,
+        "resource_id" text,
+        "details" jsonb,
+        "status" text NOT NULL,
+        "error_message" text,
+        "ip_address" text,
+        "user_agent" text,
+        "created_at" timestamp NOT NULL DEFAULT now()
+      );
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS "subdomains" (
         "id"            serial             PRIMARY KEY NOT NULL,
         "user_id"       integer            NOT NULL,

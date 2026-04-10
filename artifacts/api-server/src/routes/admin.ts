@@ -13,6 +13,7 @@ import { z } from "zod";
 import { sendTelegramMessage } from "../lib/telegram.js";
 import { toUserMessage } from "../lib/errors.js";
 import { auditLog } from "../lib/audit.js";
+import { isOrderStatus, isTicketStatus } from "../lib/status-utils.js";
 
 const router = Router();
 router.use(requireAdmin as any);
@@ -222,11 +223,10 @@ router.get("/orders", async (req: AuthRequest, res: any) => {
 });
 
 router.patch("/orders/:id", async (req: AuthRequest, res: any) => {
-  const VALID_ORDER_STATUSES = ["pending", "processing", "active", "partial", "completed", "cancelled", "failed", "refunded"] as const;
   const { status, startCount, remains, note } = req.body;
   if (!status) return res.status(400).json({ error: "status required" });
-  if (!VALID_ORDER_STATUSES.includes(status)) {
-    return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_ORDER_STATUSES.join(", ")}` });
+  if (!isOrderStatus(status)) {
+    return res.status(400).json({ error: "Invalid status" });
   }
   const updates: any = { status, updatedAt: new Date() };
   if (startCount !== undefined) updates.startCount = Number(startCount);
@@ -681,10 +681,9 @@ router.get("/tickets/:id", async (req: AuthRequest, res: any) => {
 });
 
 router.patch("/tickets/:id/status", async (req: AuthRequest, res: any) => {
-  const VALID_TICKET_STATUSES = ["open", "pending", "in_progress", "resolved", "closed"] as const;
   const { status } = req.body;
   if (!status) return res.status(400).json({ error: "status required" });
-  if (!VALID_TICKET_STATUSES.includes(status)) return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_TICKET_STATUSES.join(", ")}` });
+  if (!isTicketStatus(status)) return res.status(400).json({ error: "Invalid status" });
   await db.update(ticketsTable).set({ status, updatedAt: new Date() }).where(eq(ticketsTable.id, Number(req.params.id)));
   return res.json({ success: true, message: "Ticket updated" });
 });
@@ -830,10 +829,9 @@ router.post("/deposits/:id/rejected", async (req: AuthRequest, res: any) => {
 
 // Alias for orders status update
 router.patch("/orders/:id/status", async (req: AuthRequest, res: any) => {
-  const VALID_STATUSES = ["pending", "processing", "in_progress", "completed", "partial", "cancelled", "refunded", "failed"] as const;
   const { status } = req.body;
   if (!status) return res.status(400).json({ error: "status required" });
-  if (!VALID_STATUSES.includes(status)) return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}` });
+  if (!isOrderStatus(status)) return res.status(400).json({ error: "Invalid status" });
   const updated = await db.update(ordersTable).set({ status, updatedAt: new Date() }).where(eq(ordersTable.id, Number(req.params.id))).returning();
   if (!updated[0]) return res.status(404).json({ error: "Not found" });
   await db.insert(orderLogsTable).values({ orderId: Number(req.params.id), status, note: `Status changed to ${status} by admin` });

@@ -21,7 +21,15 @@ router.get("/categories", async (req, res) => {
 
 router.get("/services", async (req, res) => {
   const { categoryId, search } = req.query;
-  let query = db.select({
+  const conditions = [eq(servicesTable.status, "active")];
+  if (categoryId) {
+    conditions.push(eq(servicesTable.categoryId, Number(categoryId)));
+  }
+  if (search) {
+    conditions.push(ilike(servicesTable.name, `%${search}%`));
+  }
+
+  const services = await db.select({
     id: servicesTable.id,
     categoryId: servicesTable.categoryId,
     categoryName: sql<string>`(SELECT name FROM categories WHERE id = services.category_id)`,
@@ -38,18 +46,8 @@ router.get("/services", async (req, res) => {
     subscriptions: servicesTable.subscriptions,
     status: servicesTable.status,
   }).from(servicesTable)
-    .where(eq(servicesTable.status, "active"))
-    .orderBy(servicesTable.sortOrder, servicesTable.name)
-    .$dynamic();
-
-  if (categoryId) {
-    query = query.where(and(eq(servicesTable.status, "active"), eq(servicesTable.categoryId, Number(categoryId))));
-  }
-  if (search) {
-    query = query.where(and(eq(servicesTable.status, "active"), ilike(servicesTable.name, `%${search}%`)));
-  }
-
-  const services = await query;
+    .where(and(...conditions))
+    .orderBy(servicesTable.sortOrder, servicesTable.name);
   return res.json({ services });
 });
 
@@ -70,7 +68,9 @@ router.get("/services/:id", async (req, res) => {
     dripfeed: servicesTable.dripfeed,
     subscriptions: servicesTable.subscriptions,
     status: servicesTable.status,
-  }).from(servicesTable).where(eq(servicesTable.id, Number(req.params.id))).limit(1);
+  }).from(servicesTable)
+    .where(and(eq(servicesTable.id, Number(req.params.id)), eq(servicesTable.status, "active")))
+    .limit(1);
   
   if (!service[0]) return res.status(404).json({ error: "Service not found" });
   return res.json(service[0]);

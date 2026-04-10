@@ -97,8 +97,8 @@ router.post("/", requireAuth as any, orderRateLimit, async (req: AuthRequest, re
           status: "pending",
           runs: data.runs,
           interval: data.interval,
-          comments: data.comments,
-          username: data.username,
+          comments: data.comments ? sanitizeString(data.comments).slice(0, 500) : undefined,
+          username: data.username ? sanitizeString(data.username).slice(0, 100) : undefined,
         }).returning();
         await tx.update(usersTable)
           .set({ balance: newBalance.toFixed(4) })
@@ -165,6 +165,8 @@ router.post("/", requireAuth as any, orderRateLimit, async (req: AuthRequest, re
 router.post("/mass", requireAuth as any, async (req: AuthRequest, res: any) => {
   const { orders } = req.body;
   if (!Array.isArray(orders)) return res.status(400).json({ error: "orders must be an array" });
+  if (orders.length === 0) return res.status(400).json({ error: "orders cannot be empty" });
+  if (orders.length > 100) return res.status(400).json({ error: "orders cannot exceed 100 items per request" });
   
   const results = [];
   for (let i = 0; i < orders.length; i++) {
@@ -178,9 +180,21 @@ router.post("/mass", requireAuth as any, async (req: AuthRequest, res: any) => {
         const [freshUser] = await tx.select({ balance: usersTable.balance }).from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1);
         if (!freshUser || Number(freshUser.balance) < charge) throw new Error("Insufficient balance");
         const newBalance = Number(freshUser.balance) - charge;
-        const [o] = await tx.insert(ordersTable).values({ userId: req.userId!, serviceId: data.serviceId, link: data.link, quantity: data.quantity, charge: charge.toFixed(4), status: "pending" }).returning();
+        const [o] = await tx.insert(ordersTable).values({
+          userId: req.userId!,
+          serviceId: data.serviceId,
+          link: data.link,
+          quantity: data.quantity,
+          charge: charge.toFixed(4),
+          status: "pending",
+          runs: data.runs,
+          interval: data.interval,
+          comments: data.comments ? sanitizeString(data.comments).slice(0, 500) : undefined,
+          username: data.username ? sanitizeString(data.username).slice(0, 100) : undefined,
+        }).returning();
         await tx.update(usersTable).set({ balance: newBalance.toFixed(4) }).where(eq(usersTable.id, req.userId!));
         await tx.insert(transactionsTable).values({ userId: req.userId!, type: "order", amount: (-charge).toFixed(4), balanceAfter: newBalance.toFixed(4), description: `Order #${o.id}`, referenceId: o.id });
+        await tx.insert(orderLogsTable).values({ orderId: o.id, status: "pending", note: "Mass order created" });
         return o;
       });
       results.push({ index: i, success: true, orderId: newOrder.id });

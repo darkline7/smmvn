@@ -11,8 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { Ticket, MessageCircle, RefreshCw, Send, CheckCircle2 } from "lucide-react";
 
 const statusColors: Record<string, string> = {
-  open: "bg-green-100 text-green-700", answered: "bg-blue-100 text-blue-700",
-  pending: "bg-yellow-100 text-yellow-700", closed: "bg-gray-100 text-gray-600",
+  open: "bg-green-100 text-green-700",
+  pending: "bg-yellow-100 text-yellow-700",
+  closed: "bg-gray-100 text-gray-600",
 };
 
 function TicketChat({ ticketId, onClose }: { ticketId: number; onClose: () => void }) {
@@ -57,7 +58,7 @@ function TicketChat({ ticketId, onClose }: { ticketId: number; onClose: () => vo
             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="open">Open</SelectItem>
-              <SelectItem value="answered">Answered</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="closed">Closed</SelectItem>
             </SelectContent>
           </Select>
@@ -107,7 +108,6 @@ export default function AdminTickets() {
                 <SelectItem value="all">Tất cả</SelectItem>
                 <SelectItem value="open">Open</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="answered">Answered</SelectItem>
                 <SelectItem value="closed">Closed</SelectItem>
               </SelectContent>
             </Select>

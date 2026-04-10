@@ -8,7 +8,7 @@ import { authRateLimit } from "../lib/rate-limits.js";
 import { emailSchema, passwordSchema, usernameSchema } from "../lib/validate.js";
 import { z } from "zod";
 import crypto from "crypto";
-import { toUserMessage } from "../lib/errors.js";
+import { safeError, toUserMessage } from "../lib/errors.js";
 
 const router = Router();
 
@@ -80,17 +80,41 @@ router.post("/register", authRateLimit, async (req: Request, res: Response) => {
     if (existing[0]) {
       return res.status(400).json({ error: "Email hoặc tên đăng nhập đã tồn tại" });
     }
+    let referredBy: number | undefined;
+    if (data.referralCode) {
+      const [referrer] = await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(eq(usersTable.referralCode, data.referralCode))
+        .limit(1);
+      if (!referrer) {
+        throw safeError("Mã giới thiệu không hợp lệ");
+      }
+      referredBy = referrer.id;
+    }
+
     const [user] = await db.insert(usersTable).values({
       email: data.email,
       username: data.username,
       passwordHash: await hashPassword(data.password),
       apiKey: generateApiKey(),
       referralCode: generateReferralCode(),
+      ...(referredBy ? { referredBy } : {}),
     }).returning();
     setSession(req, res, { userId: user.id, userRole: user.role });
     const { passwordHash, ...safeUser } = user;
     return res.status(201).json({ user: safeUser });
   } catch (e: any) {
+    console.error("[auth/register] Failed:", e);
+    if (e?.code === "23505") {
+      return res.status(400).json({ error: "Email hoặc tên đăng nhập đã tồn tại" });
+    }
+    if (e?.code === "42P01") {
+      return res.status(500).json({ error: "Bảng dữ liệu người dùng chưa được tạo. Hãy kiểm tra migration database." });
+    }
+    if (e?.code === "08001" || e?.code === "ECONNREFUSED" || e?.code === "57P03") {
+      return res.status(503).json({ error: "Không thể kết nối cơ sở dữ liệu" });
+    }
     return res.status(400).json({ error: toUserMessage(e) });
   }
 });
@@ -123,6 +147,13 @@ router.post("/login", authRateLimit, async (req: Request, res: Response) => {
     const { passwordHash, ...safeUser } = user;
     return res.json({ user: safeUser });
   } catch (e: any) {
+    console.error("[auth/login] Failed:", e);
+    if (e?.code === "42P01") {
+      return res.status(500).json({ error: "Bảng dữ liệu người dùng chưa được tạo. Hãy kiểm tra migration database." });
+    }
+    if (e?.code === "08001" || e?.code === "ECONNREFUSED" || e?.code === "57P03") {
+      return res.status(503).json({ error: "Không thể kết nối cơ sở dữ liệu" });
+    }
     return res.status(400).json({ error: toUserMessage(e) });
   }
 });

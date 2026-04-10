@@ -1,3 +1,4 @@
+import "./load-env.js";
 import app from "./app";
 import { db } from "@workspace/db";
 import { usersTable, siteSettingsTable } from "@workspace/db/schema";

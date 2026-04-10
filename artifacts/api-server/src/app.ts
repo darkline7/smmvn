@@ -94,7 +94,9 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
   res.setHeader("X-XSS-Protection", "1; mode=block");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
-  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  if (process.env.NODE_ENV === "production") {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   next();
 });
 
@@ -112,8 +114,13 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
   // Allow requests from API itself (for cron jobs, webhooks)
   if (!req.headers.origin && !req.headers.referer) {
-    // Server-to-server requests
-    return next();
+    const noOriginAllowed =
+      req.path.startsWith("/api/webhooks/") ||
+      req.path.startsWith("/api/cron/") ||
+      req.path === "/api/v2";
+    if (noOriginAllowed) {
+      return next();
+    }
   }
 
   const allowedOrigins = [
@@ -136,8 +143,9 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     } catch { return false; }
   });
 
-  if (!isAllowed && req.headers.origin) {
-    console.warn(`[CSRF] Rejected request from origin: ${req.headers.origin}`);
+  if (!isAllowed) {
+    const source = req.headers.origin || req.headers.referer || "unknown";
+    console.warn(`[CSRF] Rejected request from origin: ${source}`);
     return res.status(403).json({ error: "CSRF validation failed" });
   }
 
@@ -152,8 +160,8 @@ app.use("/api", rateLimit({
   legacyHeaders: false,
   message: { error: "Quá nhiều yêu cầu. Vui lòng thử lại sau." },
   skip: (req) =>
-    req.path.startsWith("/api/public/") ||
-    req.path.startsWith("/api/health"),
+    req.path.startsWith("/public/") ||
+    req.path.startsWith("/health"),
 }));
 
 // ── Audit middleware (attach IP & user-agent to request) ──────────────────────

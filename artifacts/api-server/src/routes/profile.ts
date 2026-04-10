@@ -6,6 +6,7 @@ import { requireAuth, hashPassword, verifyPassword, generateApiKey } from "../li
 import type { AuthRequest } from "../lib/auth.js";
 import { z } from "zod";
 import { toUserMessage } from "../lib/errors.js";
+import { passwordSchema } from "../lib/validate.js";
 
 const router = Router();
 
@@ -20,7 +21,7 @@ router.patch("/", requireAuth as any, async (req: AuthRequest, res: Response) =>
   const schema = z.object({
     username: z.string().min(3).max(30).regex(/^[a-zA-Z0-9_]+$/, "Username chỉ chứa chữ, số và _").optional(),
     currentPassword: z.string().optional(),
-    newPassword: z.string().min(8).optional(),
+    newPassword: passwordSchema.optional(),
     timezone: z.string().max(50).optional(),
   });
   try {
@@ -31,6 +32,9 @@ router.patch("/", requireAuth as any, async (req: AuthRequest, res: Response) =>
     const updates: Record<string, any> = { updatedAt: new Date() };
     if (data.username) updates.username = data.username;
     if (data.timezone) updates.timezone = data.timezone;
+    if ((data.newPassword && !data.currentPassword) || (!data.newPassword && data.currentPassword)) {
+      return res.status(400).json({ error: "Phải nhập cả mật khẩu hiện tại và mật khẩu mới" });
+    }
     if (data.newPassword && data.currentPassword) {
       const valid = await verifyPassword(data.currentPassword, user.passwordHash, user.id);
       if (!valid) {
@@ -54,9 +58,11 @@ router.post("/api-key", requireAuth as any, async (req: AuthRequest, res: Respon
 });
 
 router.post("/password", requireAuth as any, async (req: AuthRequest, res: Response) => {
-  const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || !newPassword) return res.status(400).json({ error: "currentPassword and newPassword required" });
-  if (newPassword.length < 8) return res.status(400).json({ error: "Mật khẩu mới tối thiểu 8 ký tự" });
+  const schema = z.object({
+    currentPassword: z.string().min(1),
+    newPassword: passwordSchema,
+  });
+  const { currentPassword, newPassword } = schema.parse(req.body);
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1);
   if (!user) return res.status(404).json({ error: "Not found" });
   const valid = await verifyPassword(currentPassword, user.passwordHash, user.id);

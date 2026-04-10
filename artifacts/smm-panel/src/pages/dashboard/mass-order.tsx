@@ -47,25 +47,36 @@ export default function MassOrder() {
     const initialResults = parsedLines.map(l => ({ ...l, status: "pending" as const }));
     setResults(initialResults);
     const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
-
-    for (let i = 0; i < parsedLines.length; i++) {
-      const line = parsedLines[i];
-      try {
-        const res = await fetch(`${BASE}/api/orders`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ serviceId: parseInt(serviceId), link: line.link, quantity: line.quantity }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Failed");
-        setResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: "success", orderId: data.id } : r));
-      } catch (e: any) {
-        setResults(prev => prev.map((r, idx) => idx === i ? { ...r, status: "error", error: e.message } : r));
-      }
-      await new Promise(r => setTimeout(r, 200));
+    try {
+      const res = await fetch(`${BASE}/api/orders/mass`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          orders: parsedLines.map((line) => ({
+            serviceId: parseInt(serviceId, 10),
+            link: line.link,
+            quantity: line.quantity,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      const mapped = parsedLines.map((line, index) => {
+        const result = data.results?.find((item: any) => item.index === index);
+        if (!result) return { ...line, status: "error" as const, error: "Không nhận được kết quả từ máy chủ" };
+        if (result.success) return { ...line, status: "success" as const, orderId: result.orderId };
+        return { ...line, status: "error" as const, error: result.error || "Tạo đơn thất bại" };
+      });
+      setResults(mapped);
+      toast({
+        title: "Hoàn thành đặt hàng hàng loạt!",
+        description: `${mapped.filter((item) => item.status === "success").length}/${mapped.length} đơn thành công`,
+      });
+    } catch (e: any) {
+      toast({ title: "Lỗi đặt hàng hàng loạt", description: e.message, variant: "destructive" });
     }
     setSubmitting(false);
-    toast({ title: "Hoàn thành đặt hàng hàng loạt!" });
   };
 
   const successCount = results.filter(r => r.status === "success").length;
